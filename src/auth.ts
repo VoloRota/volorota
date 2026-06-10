@@ -299,18 +299,25 @@ function loginPage(errorMsg: string | null = null): string {
       : "";
   return layout(
     "Login",
-    `
-    <div class="card" style="max-width:360px;margin:4rem auto;">
-      <h1 style="font-size:1.3rem;margin-bottom:1rem;">VoloRota Admin Login</h1>
-      ${err}
-      <form method="POST" action="/admin/login">
-        <div class="form-row">
-          <label for="password">Password</label>
-          <input id="password" type="password" name="password" autofocus autocomplete="current-password" />
+    `<div class="login-page">
+      <div class="login-card">
+        <div class="login-wordmark">
+          <div class="wordmark-text">
+            <span class="wordmark-dot"></span>VoloRota
+          </div>
+          <div class="wordmark-sub">Church Volunteer Scheduler</div>
         </div>
-        <button type="submit">Sign in</button>
-      </form>
-    </div>`
+        ${err}
+        <form method="POST" action="/admin/login">
+          <div class="form-row">
+            <label for="password">Admin password</label>
+            <input id="password" type="password" name="password" autofocus autocomplete="current-password" />
+          </div>
+          <button type="submit" style="width:100%;margin-top:.5rem">Sign in</button>
+        </form>
+      </div>
+    </div>`,
+    { loggedIn: false }
   );
 }
 

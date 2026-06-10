@@ -81,23 +81,40 @@ app.get("/", (c) => c.redirect("/admin"));
 app.get("/admin", (c) => {
   const isCaptureMode = !process.env.VOLOROTA_SMTP_HOST;
   const captureBanner = isCaptureMode
-    ? `<div class="flash flash-info" style="margin:.5rem 0 1rem">
+    ? `<div class="flash flash-info">
          <strong>Capture mode:</strong> SMTP not configured — emails are captured, not delivered.
          <a href="/admin/outbox">View outbox</a>
        </div>`
     : "";
   const body = `
-    <h1>VoloRota Admin</h1>
+    <h1>Dashboard</h1>
     ${captureBanner}
-    <p>Welcome to the VoloRota church volunteer scheduler.</p>
-    <ul>
-      <li><a href="/admin/matrix">Matrix View</a> — see all upcoming assignments at a glance</li>
-      <li><a href="/admin/people">People</a> — manage your volunteer roster</li>
-      <li><a href="/admin/teams">Teams</a> — define teams, roles, and crew assignments</li>
-      <li><a href="/admin/templates">Templates</a> — configure recurring service schedules</li>
-      <li><a href="/admin/services">Services</a> — generate and manage service instances</li>
-      <li><a href="/admin/outbox">Email Outbox</a> — view sent emails and capture log</li>
-    </ul>`;
+    <div class="dash-grid">
+      <a class="dash-card" href="/admin/matrix">
+        <div class="dash-card-title">Matrix View</div>
+        <div class="dash-card-desc">See all upcoming assignments at a glance</div>
+      </a>
+      <a class="dash-card" href="/admin/people">
+        <div class="dash-card-title">People</div>
+        <div class="dash-card-desc">Manage your volunteer roster</div>
+      </a>
+      <a class="dash-card" href="/admin/teams">
+        <div class="dash-card-title">Teams</div>
+        <div class="dash-card-desc">Define teams, roles, and crew assignments</div>
+      </a>
+      <a class="dash-card" href="/admin/templates">
+        <div class="dash-card-title">Templates</div>
+        <div class="dash-card-desc">Configure recurring service schedules</div>
+      </a>
+      <a class="dash-card" href="/admin/services">
+        <div class="dash-card-title">Services</div>
+        <div class="dash-card-desc">Generate and manage service instances</div>
+      </a>
+      <a class="dash-card" href="/admin/outbox">
+        <div class="dash-card-title">Email Outbox</div>
+        <div class="dash-card-desc">View sent emails and capture log</div>
+      </a>
+    </div>`;
   return c.html(layout("Dashboard", body));
 });
 
