@@ -537,3 +537,111 @@ export function updateAssignmentStatus(
 ): void {
   db.prepare("UPDATE assignments SET status = ? WHERE id = ?").run(status, id);
 }
+
+// ---------------------------------------------------------------------------
+// Blockouts
+// ---------------------------------------------------------------------------
+
+export interface Blockout {
+  id: number;
+  person_id: number;
+  start_date: string;
+  end_date: string;
+  reason: string | null;
+}
+
+export function listBlockoutsForPerson(db: Database, personId: number): Blockout[] {
+  return db
+    .query(
+      "SELECT * FROM blockouts WHERE person_id = ? ORDER BY start_date, end_date"
+    )
+    .all(personId) as Blockout[];
+}
+
+export function createBlockout(
+  db: Database,
+  personId: number,
+  startDate: string,
+  endDate: string,
+  reason?: string | null
+): Blockout {
+  return db
+    .prepare(
+      `INSERT INTO blockouts (person_id, start_date, end_date, reason)
+       VALUES (?, ?, ?, ?) RETURNING *`
+    )
+    .get(personId, startDate, endDate, reason ?? null) as Blockout;
+}
+
+export function getBlockout(db: Database, id: number): Blockout | null {
+  return db
+    .query("SELECT * FROM blockouts WHERE id = ?")
+    .get(id) as Blockout | null;
+}
+
+export function deleteBlockout(db: Database, id: number): void {
+  db.prepare("DELETE FROM blockouts WHERE id = ?").run(id);
+}
+
+/**
+ * Returns true if the given person has a blockout covering the given date
+ * (date is YYYY-MM-DD string; blockout range is inclusive on both ends).
+ */
+export function isPersonBlockedOut(
+  db: Database,
+  personId: number,
+  date: string
+): boolean {
+  const row = db
+    .query(
+      `SELECT id FROM blockouts
+       WHERE person_id = ? AND start_date <= ? AND end_date >= ?
+       LIMIT 1`
+    )
+    .get(personId, date, date);
+  return row !== null;
+}
+
+/**
+ * Returns the set of person IDs (from a given list) who are blocked out on a date.
+ */
+export function blockedOutPersonIds(
+  db: Database,
+  personIds: number[],
+  date: string
+): Set<number> {
+  if (personIds.length === 0) return new Set();
+  const placeholders = personIds.map(() => "?").join(",");
+  const rows = db
+    .query(
+      `SELECT DISTINCT person_id FROM blockouts
+       WHERE person_id IN (${placeholders}) AND start_date <= ? AND end_date >= ?`
+    )
+    .all(...personIds, date, date) as Array<{ person_id: number }>;
+  return new Set(rows.map((r) => r.person_id));
+}
+
+/**
+ * Return person id → most recent non-declined assignment date within a team,
+ * or null for members who have never been assigned (or only declined).
+ * Used by the autofill engine to compute least-recently-served ordering.
+ */
+export function lastServedDateByPerson(
+  db: Database,
+  teamId: number
+): Map<number, string | null> {
+  const rows = db
+    .query(
+      `SELECT tm.person_id,
+              MAX(CASE WHEN a.status != 'declined' THEN s.date ELSE NULL END) AS last_served
+       FROM team_members tm
+       LEFT JOIN assignments a ON a.person_id = tm.person_id
+       LEFT JOIN service_slots ss ON ss.id = a.service_slot_id AND ss.team_id = tm.team_id
+       LEFT JOIN services s ON s.id = ss.service_id
+       WHERE tm.team_id = ?
+       GROUP BY tm.person_id`
+    )
+    .all(teamId) as Array<{ person_id: number; last_served: string | null }>;
+
+  return new Map(rows.map((r) => [r.person_id, r.last_served]));
+}
