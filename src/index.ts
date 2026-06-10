@@ -6,6 +6,7 @@ import { teamsRouter } from "./routes/teams.js";
 import { templatesRouter } from "./routes/templates.js";
 import { servicesRouter } from "./routes/services.js";
 import { blockoutsRouter } from "./routes/blockouts.js";
+import { matrixRouter } from "./routes/matrix.js";
 import { makeHealthRouter } from "./routes/health.js";
 import { layout } from "./views/layout.js";
 import {
@@ -60,6 +61,7 @@ app.get("/admin", (c) => {
     <h1>VoloRota Admin</h1>
     <p>Welcome to the VoloRota church volunteer scheduler.</p>
     <ul>
+      <li><a href="/admin/matrix">Matrix View</a> — see all upcoming assignments at a glance</li>
       <li><a href="/admin/people">People</a> — manage your volunteer roster</li>
       <li><a href="/admin/teams">Teams</a> — define teams, roles, and crew assignments</li>
       <li><a href="/admin/templates">Templates</a> — configure recurring service schedules</li>
@@ -74,6 +76,7 @@ app.route("/admin/people", blockoutsRouter);
 app.route("/admin/teams", teamsRouter);
 app.route("/admin/templates", templatesRouter);
 app.route("/admin/services", servicesRouter);
+app.route("/admin/matrix", matrixRouter);
 
 // Env vars:
 //   VOLOROTA_PORT          — listening port (default: PORT ?? 3000)
