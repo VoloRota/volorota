@@ -34,6 +34,7 @@ import {
   deleteBlockout,
   listBlockoutsForPerson,
   getBlockout,
+  listRelevantNotesForVolunteer,
 } from "../db/queries.js";
 import {
   lookupToken,
@@ -42,6 +43,24 @@ import {
 } from "../volunteer/tokens.js";
 import { sendMail, sendReplacementRequestEmail } from "../mail/mailer.js";
 import { escHtml } from "../views/layout.js";
+
+// ---------------------------------------------------------------------------
+// Note rendering helper (ISC-46)
+// ---------------------------------------------------------------------------
+
+/**
+ * Render a note body safely: escape ALL text first, then linkify http(s) URLs
+ * into <a href> elements (target=_blank rel=noopener). No other markup is injected.
+ */
+function linkifyNoteBody(raw: string): string {
+  const escaped = escHtml(raw);
+  // After escaping, URLs are still valid (they contain no HTML special chars).
+  // Match http:// or https:// URLs (greedy up to whitespace or end of string).
+  return escaped.replace(
+    /https?:\/\/[^\s<>"]+/g,
+    (url) => `<a href="${url}" target="_blank" rel="noopener">${url}</a>`
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Minimal volunteer layout — no admin nav, mobile-first
@@ -160,7 +179,8 @@ volunteerRouter.get("/:token", async (c) => {
   const today = new Date().toISOString().slice(0, 10);
   const upcomingRows = db
     .query(
-      `SELECT a.id AS assignment_id, a.status, s.name AS service_name, s.date, s.time, ss.role_name
+      `SELECT a.id AS assignment_id, a.status, s.id AS service_id, s.name AS service_name,
+              s.date, s.time, ss.role_name, ss.team_id
        FROM assignments a
        JOIN service_slots ss ON ss.id = a.service_slot_id
        JOIN services s ON s.id = ss.service_id
@@ -170,10 +190,12 @@ volunteerRouter.get("/:token", async (c) => {
     .all(personId, today) as Array<{
     assignment_id: number;
     status: string;
+    service_id: number;
     service_name: string;
     date: string;
     time: string;
     role_name: string;
+    team_id: number;
   }>;
 
   // Past declined assignments (last 30 days) — show for reference
@@ -200,7 +222,7 @@ volunteerRouter.get("/:token", async (c) => {
   // Blockouts
   const blockouts = listBlockoutsForPerson(db, personId);
 
-  // Build assignment rows
+  // Build assignment rows (ISC-46: include relevant service notes per assignment)
   const assignmentRows = upcomingRows
     .map((row) => {
       const badge = `<span class="badge badge-${escHtml(row.status)}">${escHtml(row.status)}</span>`;
@@ -218,8 +240,17 @@ volunteerRouter.get("/:token", async (c) => {
              </form>`
           : "";
 
+      // Fetch notes relevant to this assignment (service-wide + own team)
+      const relevantNotes = listRelevantNotesForVolunteer(db, row.service_id, row.team_id);
+      const notesHtml =
+        relevantNotes.length > 0
+          ? `<ul style="margin:.4rem 0 0;padding:0 0 0 1.1rem;font-size:.88rem;color:#333">` +
+            relevantNotes.map((n) => `<li>${linkifyNoteBody(n.body)}</li>`).join("") +
+            `</ul>`
+          : "";
+
       return `<tr>
-        <td>${escHtml(row.service_name)}</td>
+        <td>${escHtml(row.service_name)}${notesHtml}</td>
         <td>${escHtml(row.date)}</td>
         <td>${escHtml(row.role_name)}</td>
         <td>${badge}</td>

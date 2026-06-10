@@ -126,4 +126,15 @@ export function applySchema(db: Database): void {
   `);
   // Volunteer feature tables — CREATE IF NOT EXISTS so this is idempotent
   extendSchemaForVolunteer(db);
+
+  // ServiceNotes feature — freeform per-service notes (ISC-45, ISC-46)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS service_notes (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      team_id    INTEGER REFERENCES teams(id) ON DELETE CASCADE,
+      body       TEXT    NOT NULL,
+      created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
 }

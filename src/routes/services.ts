@@ -15,6 +15,9 @@ import {
   listTeams,
   listTeamRoles,
   isPersonBlockedOut,
+  createServiceNote,
+  listServiceNotes,
+  deleteServiceNote,
 } from "../db/queries.js";
 import { runAutofill } from "../engine/autofill.js";
 import { layout, escHtml, flash } from "../views/layout.js";
@@ -249,6 +252,28 @@ servicesRouter.get("/:id", (c) => {
     .map((t) => `<option value="${t.id}">${escHtml(t.name)}</option>`)
     .join("");
 
+  // Notes section (ISC-45)
+  const notes = listServiceNotes(db, id);
+  const teamOptionsForNote =
+    `<option value="">— all volunteers —</option>` +
+    teams.map((t) => `<option value="${t.id}">${escHtml(t.name)}</option>`).join("");
+  const noteRows = notes
+    .map((n) => {
+      const teamName = n.team_id
+        ? (teams.find((t) => t.id === n.team_id)?.name ?? String(n.team_id))
+        : null;
+      const scopeLabel = teamName
+        ? `<span style="font-size:.8rem;color:#888">[${escHtml(teamName)}]</span> `
+        : "";
+      return `<li style="margin:.4rem 0;display:flex;align-items:flex-start;gap:.5rem">
+        <span style="flex:1">${scopeLabel}${escHtml(n.body)}</span>
+        <form method="POST" action="/admin/services/${id}/notes/${n.id}/delete" style="display:inline">
+          <button type="submit" class="btn btn-sm" style="background:#c0392b;color:#fff;padding:.2rem .5rem;font-size:.8rem">Delete</button>
+        </form>
+      </li>`;
+    })
+    .join("");
+
   const body = `
     <h1>${escHtml(svc.name)}</h1>
     <p style="color:#555">${escHtml(svc.date)} at ${escHtml(svc.time)}${templateInfo}</p>
@@ -294,9 +319,61 @@ servicesRouter.get("/:id", (c) => {
             updateSlotRoles();
           </script>`
         : ""
-    }`;
+    }
+
+    <div class="card" style="margin-top:1rem" id="service-notes">
+      <h2 style="margin-top:0">Service Notes</h2>
+      <p style="font-size:.85rem;color:#666">Notes visible to volunteers on their assignment page. Optionally scope to a team.</p>
+      ${notes.length > 0
+        ? `<ul style="list-style:none;padding:0;margin:.4rem 0">${noteRows}</ul>`
+        : `<p style="color:#999;font-size:.9rem">No notes yet.</p>`}
+      <form method="POST" action="/admin/services/${id}/notes" style="margin-top:.8rem">
+        <div class="form-row">
+          <label for="note_body">Note text</label>
+          <textarea id="note_body" name="body" rows="3" required
+            style="width:100%;padding:.5rem;border:1px solid #ccc;border-radius:4px;font-size:.95rem;resize:vertical"
+            placeholder="e.g. Sound check at 8:30 am — setup doc: https://example.com/doc"></textarea>
+        </div>
+        <div class="form-row">
+          <label for="note_team">Scope (optional)</label>
+          <select id="note_team" name="team_id">${teamOptionsForNote}</select>
+        </div>
+        <button type="submit" class="btn btn-sm">Add Note</button>
+      </form>
+    </div>`;
 
   return c.html(layout(`Service: ${svc.name}`, body));
+});
+
+// Add note to service (ISC-45)
+servicesRouter.post("/:id/notes", async (c) => {
+  const db = getDb();
+  const id = Number(c.req.param("id"));
+  const formBody = await c.req.parseBody();
+  const bodyText = String(formBody["body"] ?? "").trim();
+  const teamIdRaw = String(formBody["team_id"] ?? "").trim();
+  const teamId = teamIdRaw ? Number(teamIdRaw) : null;
+
+  if (!bodyText) return c.redirect(`/admin/services/${id}?err=Note+text+required#service-notes`);
+
+  const svc = getService(db, id);
+  if (!svc) return c.notFound();
+
+  createServiceNote(db, id, teamId, bodyText);
+  return c.redirect(`/admin/services/${id}?msg=Note+added#service-notes`);
+});
+
+// Delete note from service (ISC-45)
+servicesRouter.post("/:id/notes/:noteId/delete", async (c) => {
+  const db = getDb();
+  const id = Number(c.req.param("id"));
+  const noteId = Number(c.req.param("noteId"));
+
+  const svc = getService(db, id);
+  if (!svc) return c.notFound();
+
+  deleteServiceNote(db, noteId);
+  return c.redirect(`/admin/services/${id}?msg=Note+deleted#service-notes`);
 });
 
 // Add slot to service
