@@ -75,40 +75,149 @@ function volLayout(title: string, body: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escHtml(title)} — VoloRota</title>
   <style>
+    /* === VoloRota volunteer surface — mobile-first, self-contained === */
+    /* Tokens */
+    :root{
+      --acc:#0f766e;--acc-dk:#0d5e58;--acc-lt:#ccfbf1;--acc-txt:#134e4a;
+      --bg:#f8fafc;--card:#fff;--border:#e2e8f0;--line:#f1f5f9;
+      --txt:#0f172a;--txt2:#475569;--muted:#94a3b8;
+      --ok-bg:#dcfce7;--ok-bd:#16a34a;--ok-tx:#14532d;
+      --pend-bg:#fef9c3;--pend-bd:#ca8a04;--pend-tx:#713f12;
+      --no-bg:#fee2e2;--no-bd:#dc2626;--no-tx:#7f1d1d;
+      --info-bg:#eff6ff;--info-bd:#bfdbfe;--info-tx:#1e40af;
+      --warn-bg:#fff1f2;--warn-bd:#fecdd3;--warn-tx:#881337;
+      --sh:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.05);
+    }
     *,*::before,*::after{box-sizing:border-box}
-    body{font-family:system-ui,sans-serif;margin:0;background:#f7f7f7;color:#1a1a1a;font-size:1rem}
-    .vhdr{background:#2c3e50;color:#fff;padding:.8rem 1rem;font-size:1.1rem;font-weight:600}
-    .vcontent{max-width:600px;margin:0 auto;padding:1rem}
-    .card{background:#fff;border-radius:8px;padding:1rem;margin:.8rem 0;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-    h1{font-size:1.4rem;margin:.2rem 0 .6rem}
-    h2{font-size:1.1rem;margin:.8rem 0 .4rem}
-    table{width:100%;border-collapse:collapse;font-size:.9rem}
-    th,td{text-align:left;padding:.5rem .4rem;border-bottom:1px solid #eee}
-    th{font-weight:600;color:#555}
-    .btn{display:inline-block;padding:.6rem 1.1rem;border:none;border-radius:6px;font-size:1rem;cursor:pointer;text-decoration:none;font-weight:500}
-    .btn-accept{background:#27ae60;color:#fff}
-    .btn-decline{background:#c0392b;color:#fff}
-    .btn-request{background:#2980b9;color:#fff}
-    .btn-delete{background:#e74c3c;color:#fff;padding:.3rem .7rem;font-size:.85rem}
-    .btn-submit{background:#2c3e50;color:#fff}
-    .badge{display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.78rem;font-weight:600}
-    .badge-pending{background:#f39c12;color:#fff}
-    .badge-confirmed{background:#27ae60;color:#fff}
-    .badge-declined{background:#c0392b;color:#fff}
-    .flash{padding:.7rem 1rem;border-radius:6px;margin:.6rem 0}
-    .flash-success{background:#d5f5e3;color:#1e8449}
-    .flash-error{background:#fce4e4;color:#a93226}
-    .flash-info{background:#d6eaf8;color:#1a5276}
-    .form-row{margin:.5rem 0}
-    .form-row label{display:block;font-weight:500;margin-bottom:.2rem;font-size:.9rem}
-    .form-row input,.form-row textarea{width:100%;padding:.5rem;border:1px solid #ccc;border-radius:4px;font-size:1rem}
-    .btn-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem}
-    p.muted{color:#666;font-size:.9rem}
+    body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+         margin:0;background:var(--bg);color:var(--txt);font-size:1rem;
+         line-height:1.6;-webkit-font-smoothing:antialiased}
+    /* Header */
+    .vhdr{background:#0f172a;color:#f1f5f9;padding:.9rem 1.25rem;
+          display:flex;align-items:center;gap:.6rem;
+          font-size:1.05rem;font-weight:700;letter-spacing:-.02em;
+          position:sticky;top:0;z-index:50;
+          box-shadow:0 1px 0 rgba(255,255,255,.05),0 2px 4px rgba(0,0,0,.2)}
+    .vhdr::before{content:"";display:inline-block;width:8px;height:8px;
+                  background:#5eead4;border-radius:50%;flex-shrink:0}
+    /* Content */
+    .vcontent{max-width:600px;margin:0 auto;padding:1.25rem 1rem 3rem}
+    /* Cards */
+    .card{background:var(--card);border-radius:10px;padding:1.25rem;
+          margin:.75rem 0;box-shadow:var(--sh);border:1px solid var(--border)}
+    /* Typography */
+    h1{font-size:1.35rem;font-weight:700;letter-spacing:-.02em;
+       margin:.1rem 0 .5rem;color:var(--txt)}
+    h2{font-size:1.05rem;font-weight:600;margin:.9rem 0 .4rem;color:var(--txt)}
+    h3{font-size:.9rem;font-weight:600;margin:.8rem 0 .3rem;color:var(--txt2)}
+    p.muted{color:var(--txt2);font-size:.875rem;margin:.2rem 0 .6rem}
+    a{color:var(--acc)}
+    a:hover{text-decoration:underline}
+    /* Tables */
+    table{width:100%;border-collapse:collapse;font-size:.875rem}
+    th{text-align:left;padding:.4rem .5rem;
+       font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;
+       color:var(--muted);border-bottom:1px solid var(--border)}
+    td{text-align:left;padding:.65rem .5rem;border-bottom:1px solid var(--line);
+       vertical-align:middle}
+    td a{overflow-wrap:anywhere;word-break:break-all}
+    tr:last-child td{border-bottom:none}
+    /* Phone: 5 columns can't fit — each assignment row becomes a stacked card */
+    @media (max-width: 560px){
+      .assignments table,.assignments tbody,.assignments tr,.assignments td{display:block;width:100%}
+      .assignments thead{display:none}
+      .assignments tr{background:#fff;border:1px solid var(--border);border-radius:10px;
+        padding:.75rem .85rem;margin:0 0 .75rem}
+      .assignments td{border:none;padding:.15rem 0}
+      .assignments td:nth-child(1){font-weight:600;font-size:1rem;padding-bottom:.35rem}
+      .assignments td:nth-child(1) ul{font-weight:400}
+      .assignments td:nth-child(2),.assignments td:nth-child(3){
+        display:inline-block;width:auto;color:var(--muted);font-size:.85rem;
+        padding-right:.75rem}
+      .assignments td:nth-child(4){display:inline-block;width:auto;padding:.15rem 0}
+      .assignments td:nth-child(5){padding-top:.6rem}
+      .assignments td:nth-child(5) .btn{padding:.6rem 1.2rem}
+    }
+    /* Assignment row — card-like on mobile */
+    .asgn-row{display:flex;flex-direction:column;gap:.2rem;
+              background:var(--card);border-radius:8px;
+              border:1px solid var(--border);padding:.9rem 1rem;margin:.5rem 0;
+              box-shadow:0 1px 2px rgba(15,23,42,.05)}
+    .asgn-row-meta{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+    .asgn-row-title{font-weight:600;font-size:.95rem;color:var(--txt)}
+    .asgn-row-detail{font-size:.8rem;color:var(--txt2)}
+    .asgn-row-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem}
+    /* Buttons — big tap targets on mobile */
+    .btn{display:inline-flex;align-items:center;justify-content:center;
+         padding:.7rem 1.3rem;border:none;border-radius:6px;
+         font-size:.95rem;font-family:inherit;cursor:pointer;
+         text-decoration:none;font-weight:600;
+         transition:background .15s,transform .08s;white-space:nowrap;min-height:44px}
+    .btn:active{transform:translateY(1px)}
+    .btn-accept{background:var(--ok-bd);color:#fff}
+    .btn-accept:hover{background:#15803d}
+    .btn-decline{background:var(--no-bd);color:#fff}
+    .btn-decline:hover{background:#b91c1c}
+    .btn-request{background:var(--acc);color:#fff}
+    .btn-request:hover{background:var(--acc-dk)}
+    .btn-delete{background:var(--no-bg);color:var(--no-tx);
+                border:1px solid var(--no-bd);padding:.4rem .8rem;font-size:.8rem;min-height:36px}
+    .btn-delete:hover{background:#fecaca}
+    .btn-submit{background:var(--acc);color:#fff}
+    .btn-submit:hover{background:var(--acc-dk)}
+    .btn-sm{padding:.4rem .9rem;font-size:.82rem;min-height:36px}
+    /* Status chips */
+    .chip{display:inline-flex;align-items:center;padding:3px .6rem;
+          border-radius:999px;font-size:.72rem;font-weight:700;
+          letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
+    .chip-confirmed{background:var(--ok-bg);color:var(--ok-tx)}
+    .chip-pending{background:var(--pend-bg);color:var(--pend-tx)}
+    .chip-declined{background:var(--no-bg);color:var(--no-tx)}
+    /* Backwards compat: .badge maps to .chip */
+    .badge{display:inline-flex;align-items:center;padding:3px .6rem;
+           border-radius:999px;font-size:.72rem;font-weight:700;
+           letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
+    .badge-pending{background:var(--pend-bg);color:var(--pend-tx)}
+    .badge-confirmed{background:var(--ok-bg);color:var(--ok-tx)}
+    .badge-declined{background:var(--no-bg);color:var(--no-tx)}
+    /* Flash banners */
+    .flash{padding:.75rem 1rem;border-radius:6px;border:1px solid transparent;
+           font-size:.875rem;margin:.5rem 0;line-height:1.5}
+    .flash-success{background:var(--ok-bg);color:var(--ok-tx);border-color:#bbf7d0}
+    .flash-error{background:var(--warn-bg);color:var(--warn-tx);border-color:var(--warn-bd)}
+    .flash-info{background:var(--info-bg);color:var(--info-tx);border-color:var(--info-bd)}
+    /* Forms */
+    .form-row{margin:.6rem 0}
+    .form-row label{display:block;font-weight:600;font-size:.8rem;
+                    color:var(--txt2);letter-spacing:.01em;margin-bottom:.25rem}
+    .form-row input,.form-row textarea{
+      width:100%;padding:.6rem .75rem;border:1px solid var(--border);
+      border-radius:5px;font-size:1rem;font-family:inherit;
+      background:var(--card);color:var(--txt);
+      transition:border-color .15s,box-shadow .15s}
+    .form-row input:focus,.form-row textarea:focus{
+      outline:none;border-color:var(--acc);
+      box-shadow:0 0 0 3px rgba(15,118,110,.12)}
+    .btn-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem}
+    /* Calendar link block */
+    .cal-block{background:var(--line);border-radius:6px;
+               padding:.75rem 1rem;margin:.5rem 0;font-size:.8rem}
+    .cal-url{font-family:ui-monospace,monospace;font-size:.75rem;word-break:break-all;
+             background:var(--card);padding:.3rem .5rem;border-radius:4px;
+             border:1px solid var(--border);display:block;margin:.4rem 0}
+    /* Details/summary */
+    details summary{cursor:pointer;font-size:.875rem;color:var(--acc);
+                    font-weight:500;user-select:none}
+    details summary:hover{text-decoration:underline}
+    /* Footer */
+    .vfooter{text-align:center;padding:2rem 1rem 1rem;
+             font-size:.72rem;color:var(--muted);letter-spacing:.04em}
   </style>
 </head>
 <body>
   <div class="vhdr">VoloRota</div>
   <div class="vcontent">${body}</div>
+  <div class="vfooter">VoloRota &middot; AGPL-3.0 &middot; self-hosted</div>
 </body>
 </html>`;
 }
@@ -245,7 +354,7 @@ volunteerRouter.get("/:token", async (c) => {
       const relevantNotes = listRelevantNotesForVolunteer(db, row.service_id, row.team_id);
       const notesHtml =
         relevantNotes.length > 0
-          ? `<ul style="margin:.4rem 0 0;padding:0 0 0 1.1rem;font-size:.88rem;color:#333">` +
+          ? `<ul style="margin:.4rem 0 0;padding:0 0 0 1.1rem;font-size:.88rem;color:#333;overflow-wrap:anywhere">` +
             relevantNotes.map((n) => `<li>${linkifyNoteBody(n.body)}</li>`).join("") +
             `</ul>`
           : "";
@@ -309,10 +418,12 @@ volunteerRouter.get("/:token", async (c) => {
       </details>
 
       <h2>Upcoming Assignments</h2>
+      <div class="assignments">
       <table>
         <thead><tr><th>Service</th><th>Date</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
         <tbody>${assignmentRows || '<tr><td colspan="5" style="color:#999">No upcoming assignments.</td></tr>'}</tbody>
       </table>
+      </div>
 
       ${
         declinedRows
