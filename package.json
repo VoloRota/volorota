@@ -1,5 +1,6 @@
 {
   "name": "volorota",
+  "version": "0.1.0",
   "description": "Self-hosted volunteer scheduling for churches. A roster of the willing.",
   "license": "AGPL-3.0-only",
   "module": "src/index.ts",

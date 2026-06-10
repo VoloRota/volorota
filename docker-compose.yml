@@ -1,0 +1,25 @@
+services:
+  volorota:
+    image: volorota:latest       # build locally: docker build -t volorota:latest .
+    build: .
+    ports:
+      - "${VOLOROTA_PORT:-3000}:3000"
+    volumes:
+      - volorota_data:/data      # all SQLite state lives here; survives container recreation
+    environment:
+      # Path to the SQLite database inside the container (leave as-is unless you know why)
+      VOLOROTA_DB: /data/volorota.db
+      # Listening port inside the container (the port: mapping above exposes it on the host)
+      VOLOROTA_PORT: "3000"
+      # --- arriving with the Auth feature (leave commented until that feature ships) ---
+      # VOLOROTA_ADMIN_PASSWORD: changeme
+      # VOLOROTA_SESSION_SECRET: a-long-random-string
+      # --- arriving with the Notifications feature ---
+      # VOLOROTA_SMTP_HOST: smtp.example.com
+      # VOLOROTA_SMTP_PORT: "587"
+      # VOLOROTA_SMTP_USER: volorota@example.com
+      # VOLOROTA_SMTP_PASS: smtp-password
+    restart: unless-stopped
+
+volumes:
+  volorota_data:
