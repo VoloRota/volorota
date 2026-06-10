@@ -14,7 +14,9 @@ import {
   listPeople,
   listTeams,
   listTeamRoles,
+  isPersonBlockedOut,
 } from "../db/queries.js";
+import { runAutofill } from "../engine/autofill.js";
 import { layout, escHtml, flash } from "../views/layout.js";
 
 export const servicesRouter = new Hono();
@@ -94,6 +96,21 @@ servicesRouter.get("/", (c) => {
       </form>
     </div>
 
+    <div class="card">
+      <h2>Auto-fill a Date Range</h2>
+      <form method="POST" action="/admin/services/autofill-range">
+        <div class="form-row">
+          <label for="af_start">Start Date</label>
+          <input type="date" id="af_start" name="start_date" required />
+        </div>
+        <div class="form-row">
+          <label for="af_end">End Date</label>
+          <input type="date" id="af_end" name="end_date" required />
+        </div>
+        <button type="submit">Auto-fill All Services</button>
+      </form>
+    </div>
+
     <h2>All Services (${services.length})</h2>
     <table>
       <thead><tr><th>Name</th><th>Date</th><th>Time</th><th>Type</th></tr></thead>
@@ -145,6 +162,21 @@ servicesRouter.post("/oneoff", async (c) => {
   return c.redirect(`/admin/services/${svc.id}?msg=Service+created`);
 });
 
+// Auto-fill a date range
+servicesRouter.post("/autofill-range", async (c) => {
+  const db = getDb();
+  const body = await c.req.parseBody();
+  const startDate = String(body["start_date"] ?? "");
+  const endDate = String(body["end_date"] ?? "");
+
+  if (!startDate || !endDate) {
+    return c.redirect("/admin/services?err=Start+and+end+date+required");
+  }
+
+  const report = runAutofill(db, { startDate, endDate });
+  return c.html(layout("Auto-fill Results", renderAutofillReport(report, null)));
+});
+
 // Service detail — slots + assignments
 servicesRouter.get("/:id", (c) => {
   const db = getDb();
@@ -159,13 +191,18 @@ servicesRouter.get("/:id", (c) => {
   const msg = c.req.query("msg") ?? null;
   const err = c.req.query("err") ?? null;
 
-  // For one-off services allow adding slot definitions
   const templateInfo = svc.template_id
     ? (() => {
         const tmpl = getTemplate(db, svc.template_id!);
         return tmpl ? ` (from template: <a href="/admin/templates/${tmpl.id}">${escHtml(tmpl.name)}</a>)` : "";
       })()
     : "";
+
+  // Pre-compute which people are blocked out on this service date (ISC-22)
+  const blockedPersonIds = new Set<number>(
+    allPeople.filter((p) => isPersonBlockedOut(db, p.id, svc.date)).map((p) => p.id)
+  );
+  const anyoneBlocked = blockedPersonIds.size > 0;
 
   const slotRows = slots
     .map((slot) => {
@@ -180,11 +217,14 @@ servicesRouter.get("/:id", (c) => {
         ? `<span class="badge badge-${escHtml(assignment.status)}">${escHtml(assignment.status)}</span>`
         : `<span style="color:#999">unfilled</span>`;
 
+      // Build person options with blockout indicator (ISC-22)
       const assignOptions = allPeople
-        .map(
-          (p) =>
-            `<option value="${p.id}" ${assignment?.person_id === p.id ? "selected" : ""}>${escHtml(p.name)}</option>`
-        )
+        .map((p) => {
+          const blocked = blockedPersonIds.has(p.id);
+          const indicator = blocked ? " [BLOCKED OUT]" : "";
+          const dataBlocked = blocked ? 'data-blocked="true"' : "";
+          return `<option value="${p.id}" ${assignment?.person_id === p.id ? "selected" : ""} ${dataBlocked}>${escHtml(p.name)}${escHtml(indicator)}</option>`;
+        })
         .join("");
 
       return `<tr>
@@ -215,7 +255,14 @@ servicesRouter.get("/:id", (c) => {
     ${flash(err, "error")}
     <a href="/admin/services">&larr; All Services</a>
 
+    <div style="margin:.8rem 0">
+      <form method="POST" action="/admin/services/${id}/autofill" style="display:inline">
+        <button type="submit" class="btn">Auto-fill This Service</button>
+      </form>
+    </div>
+
     <h2>Slots &amp; Assignments</h2>
+    ${anyoneBlocked ? `<p style="font-size:0.85rem;color:#666"><em>[BLOCKED OUT]</em> next to a name indicates that person has a blockout on ${escHtml(svc.date)}.</p>` : ""}
     <table>
       <thead><tr><th>Team</th><th>Role</th><th>Position</th><th>Assigned</th><th>Status</th><th>Assign</th></tr></thead>
       <tbody>${slotRows.length ? slotRows : '<tr><td colspan="6" style="color:#999">No slots defined.</td></tr>'}</tbody>
@@ -271,16 +318,140 @@ servicesRouter.post("/:id/slots", async (c) => {
   return c.redirect(`/admin/services/${id}?msg=Slot+added`);
 });
 
-// Assign person to slot
+// Assign person to slot — with conflict detection (ISC-20, ISC-21)
 servicesRouter.post("/:id/slots/:slotId/assign", async (c) => {
   const db = getDb();
   const id = Number(c.req.param("id"));
   const slotId = Number(c.req.param("slotId"));
   const body = await c.req.parseBody();
   const personId = Number(body["person_id"]);
+  const override = body["override"] === "1";
 
   if (!personId) return c.redirect(`/admin/services/${id}?err=Person+required`);
+
+  const svc = getService(db, id);
+  if (!svc) return c.notFound();
+
+  const allPeople = listPeople(db);
+  const person = allPeople.find((p) => p.id === personId);
+  if (!person) return c.redirect(`/admin/services/${id}?err=Person+not+found`);
+
+  // Detect conflicts (unless override is set)
+  if (!override) {
+    const conflicts: string[] = [];
+
+    // ISC-20: check blockout
+    if (isPersonBlockedOut(db, personId, svc.date)) {
+      conflicts.push(`${escHtml(person.name)} is blocked out on ${escHtml(svc.date)}.`);
+    }
+
+    // ISC-21: check double-booking in the same service
+    const existingAssignments = listAssignmentsForService(db, id);
+    const alreadyInService = existingAssignments.some(
+      (a) => a.person_id === personId && a.service_slot_id !== slotId
+    );
+    if (alreadyInService) {
+      conflicts.push(`${escHtml(person.name)} is already assigned to another role in this service.`);
+    }
+
+    if (conflicts.length > 0) {
+      // Render conflict interstitial
+      const conflictHtml = conflicts.map((c) => `<li>${c}</li>`).join("");
+      const body = `
+        <h1>Assignment Conflict Warning</h1>
+        <div class="flash flash-error">
+          <strong>Conflict detected:</strong>
+          <ul>${conflictHtml}</ul>
+        </div>
+        <p>Do you want to assign <strong>${escHtml(person.name)}</strong> anyway?</p>
+        <form method="POST" action="/admin/services/${id}/slots/${slotId}/assign">
+          <input type="hidden" name="person_id" value="${personId}" />
+          <input type="hidden" name="override" value="1" />
+          <button type="submit" class="btn" style="background:#c0392b">Assign Anyway</button>
+          &nbsp;
+          <a href="/admin/services/${id}" class="btn" style="background:#555">Cancel</a>
+        </form>`;
+      return c.html(layout("Assignment Conflict", body));
+    }
+  }
 
   createAssignment(db, slotId, personId);
   return c.redirect(`/admin/services/${id}?msg=Assignment+saved`);
 });
+
+// Auto-fill a single service
+servicesRouter.post("/:id/autofill", async (c) => {
+  const db = getDb();
+  const id = Number(c.req.param("id"));
+  const svc = getService(db, id);
+  if (!svc) return c.notFound();
+
+  const report = runAutofill(db, { serviceId: id });
+  return c.html(layout("Auto-fill Results", renderAutofillReport(report, id)));
+});
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+function renderAutofillReport(
+  report: { filled: Array<{ serviceName: string; serviceDate: string; roleName: string; position: number; personName: string; crewName?: string }>; skipped: Array<{ serviceName: string; serviceDate: string; roleName: string; position: number; reason: string; crewName?: string; personName?: string }> },
+  serviceId: number | null
+): string {
+  const backLink = serviceId
+    ? `<a href="/admin/services/${serviceId}">&larr; Back to Service</a>`
+    : `<a href="/admin/services">&larr; All Services</a>`;
+
+  const filledRows = report.filled.map((f) =>
+    `<tr>
+      <td>${escHtml(f.serviceName)}</td>
+      <td>${escHtml(f.serviceDate)}</td>
+      <td>${escHtml(f.roleName)}</td>
+      <td>${f.position + 1}</td>
+      <td>${escHtml(f.personName)}${f.crewName ? ` <em>(${escHtml(f.crewName)})</em>` : ""}</td>
+    </tr>`
+  ).join("");
+
+  const skippedRows = report.skipped.map((s) => {
+    const reasonMap: Record<string, string> = {
+      all_candidates_blocked: "All candidates blocked out",
+      no_team_members: "No team members",
+      no_crew_members: "No crew members",
+      crew_member_blocked: `Crew member blocked out${s.personName ? `: ${s.personName}` : ""}`,
+      already_assigned: "Already assigned",
+    };
+    const reasonText = reasonMap[s.reason] ?? s.reason;
+    return `<tr>
+      <td>${escHtml(s.serviceName)}</td>
+      <td>${escHtml(s.serviceDate)}</td>
+      <td>${escHtml(s.roleName)}</td>
+      <td>${s.position + 1}</td>
+      <td>${escHtml(reasonText)}${s.crewName ? ` <em>(crew: ${escHtml(s.crewName)})</em>` : ""}</td>
+    </tr>`;
+  }).join("");
+
+  return `
+    <h1>Auto-fill Results</h1>
+    ${backLink}
+    <p style="margin:.8rem 0">
+      <strong>${report.filled.length}</strong> slot(s) filled &nbsp;|&nbsp;
+      <strong>${report.skipped.length}</strong> slot(s) could not be filled.
+    </p>
+
+    ${report.filled.length > 0 ? `
+    <h2>Filled (${report.filled.length})</h2>
+    <table>
+      <thead><tr><th>Service</th><th>Date</th><th>Role</th><th>Position</th><th>Assigned To</th></tr></thead>
+      <tbody>${filledRows}</tbody>
+    </table>` : ""}
+
+    ${report.skipped.length > 0 ? `
+    <h2>Could Not Fill (${report.skipped.length})</h2>
+    <table>
+      <thead><tr><th>Service</th><th>Date</th><th>Role</th><th>Position</th><th>Reason</th></tr></thead>
+      <tbody>${skippedRows}</tbody>
+    </table>` : ""}
+
+    ${report.filled.length === 0 && report.skipped.length === 0 ? `<p style="color:#999">No unfilled slots found in the selected range.</p>` : ""}
+  `;
+}

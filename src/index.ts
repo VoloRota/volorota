@@ -5,6 +5,7 @@ import { peopleRouter } from "./routes/people.js";
 import { teamsRouter } from "./routes/teams.js";
 import { templatesRouter } from "./routes/templates.js";
 import { servicesRouter } from "./routes/services.js";
+import { blockoutsRouter } from "./routes/blockouts.js";
 import { makeHealthRouter } from "./routes/health.js";
 import { layout } from "./views/layout.js";
 import {
@@ -69,6 +70,7 @@ app.get("/admin", (c) => {
 
 // Mount routers
 app.route("/admin/people", peopleRouter);
+app.route("/admin/people", blockoutsRouter);
 app.route("/admin/teams", teamsRouter);
 app.route("/admin/templates", templatesRouter);
 app.route("/admin/services", servicesRouter);

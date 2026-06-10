@@ -113,5 +113,14 @@ export function applySchema(db: Database): void {
                                CHECK(status IN ('pending','confirmed','declined')),
       UNIQUE(service_slot_id, person_id)
     );
+
+    CREATE TABLE IF NOT EXISTS blockouts (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      person_id  INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+      start_date TEXT    NOT NULL,
+      end_date   TEXT    NOT NULL,
+      reason     TEXT,
+      CHECK(end_date >= start_date)
+    );
   `);
 }
