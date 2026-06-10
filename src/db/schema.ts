@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
+import { extendSchemaForVolunteer } from "../volunteer/tokens.js";
 
 let _db: Database | null = null;
 
@@ -19,7 +20,7 @@ export function getDb(): Database {
   _db.exec("PRAGMA journal_mode = WAL;");
   _db.exec("PRAGMA foreign_keys = ON;");
 
-  applySchema(_db);
+  applySchema(_db); // includes extendSchemaForVolunteer
   return _db;
 }
 
@@ -123,4 +124,6 @@ export function applySchema(db: Database): void {
       CHECK(end_date >= start_date)
     );
   `);
+  // Volunteer feature tables — CREATE IF NOT EXISTS so this is idempotent
+  extendSchemaForVolunteer(db);
 }

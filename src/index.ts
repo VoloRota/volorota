@@ -8,6 +8,8 @@ import { servicesRouter } from "./routes/services.js";
 import { blockoutsRouter } from "./routes/blockouts.js";
 import { matrixRouter } from "./routes/matrix.js";
 import { makeHealthRouter } from "./routes/health.js";
+import { volunteerRouter } from "./routes/volunteer.js";
+import { adminVolunteerRouter } from "./routes/admin-volunteer.js";
 import { layout } from "./views/layout.js";
 import {
   validateAuthConfig,
@@ -77,6 +79,13 @@ app.route("/admin/teams", teamsRouter);
 app.route("/admin/templates", templatesRouter);
 app.route("/admin/services", servicesRouter);
 app.route("/admin/matrix", matrixRouter);
+
+// Admin volunteer touchpoints (inside auth gate via /admin/* middleware above)
+app.route("/admin/people", adminVolunteerRouter);
+app.route("/admin/services", adminVolunteerRouter);
+
+// Volunteer surface — OUTSIDE the admin auth gate
+app.route("/v", volunteerRouter);
 
 // Env vars:
 //   VOLOROTA_PORT          — listening port (default: PORT ?? 3000)
