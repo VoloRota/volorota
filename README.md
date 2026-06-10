@@ -17,7 +17,7 @@ Licensed under [AGPL-3.0](LICENSE).
 | Data layer (people, teams, roles, templates, services) | Done |
 | Admin UI scaffolding | Done |
 | CSV people import | Done |
-| Authentication (admin password gate) | In progress |
+| Authentication (admin password gate) | Done |
 | Volunteer flow (magic-link accept/decline/swap) | Planned |
 | Auto-rotation scheduler | Planned |
 | Email notifications (SMTP) | Planned |
@@ -37,10 +37,11 @@ docker run -d \
   -p 3000:3000 \
   -v volorota_data:/data \
   -e VOLOROTA_PORT=3000 \
+  -e VOLOROTA_ADMIN_PASSWORD='pick-a-strong-password' \
   volorota:latest
 ```
 
-Open `http://localhost:3000` in a browser — you land on the admin dashboard.
+Open `http://localhost:3000` in a browser and sign in at the login page with the password you set. `VOLOROTA_ADMIN_PASSWORD` is required — the server refuses to start without it.
 
 ### Option B — Docker Compose (recommended for self-hosting)
 
@@ -110,7 +111,8 @@ You now have a published schedule. Total time: ~15 minutes for a typical roster.
 |----------|---------|-------------|
 | `VOLOROTA_PORT` | `3000` (falls back to `PORT`) | Listening port |
 | `VOLOROTA_DB` | `./data/volorota.db` (host), `/data/volorota.db` (container) | SQLite database path |
-| `VOLOROTA_ADMIN_PASSWORD` | — | *(arriving with Auth feature)* Admin console password |
+| `VOLOROTA_ADMIN_PASSWORD` | — | **Required.** Admin console password; server refuses to start without it |
+| `VOLOROTA_SESSION_SECRET` | auto | Optional session-signing secret (≥32 chars); generated and persisted in the DB if unset |
 | `VOLOROTA_SESSION_SECRET` | — | *(arriving with Auth feature)* Cookie signing secret |
 | `VOLOROTA_SMTP_HOST` | — | *(arriving with Notifications feature)* SMTP relay host |
 | `VOLOROTA_SMTP_PORT` | — | SMTP port |

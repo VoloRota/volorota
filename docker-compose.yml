@@ -11,8 +11,9 @@ services:
       VOLOROTA_DB: /data/volorota.db
       # Listening port inside the container (the port: mapping above exposes it on the host)
       VOLOROTA_PORT: "3000"
-      # --- arriving with the Auth feature (leave commented until that feature ships) ---
-      # VOLOROTA_ADMIN_PASSWORD: changeme
+      # REQUIRED — admin console password; the server refuses to start without it
+      VOLOROTA_ADMIN_PASSWORD: change-me-to-a-strong-password
+      # Optional — session-signing secret (>=32 chars); auto-generated and persisted if unset
       # VOLOROTA_SESSION_SECRET: a-long-random-string
       # --- arriving with the Notifications feature ---
       # VOLOROTA_SMTP_HOST: smtp.example.com

@@ -40,6 +40,7 @@ start_container() {
     -p "127.0.0.1:${PORT}:3000" \
     -v "${VOLUME}:/data" \
     -e VOLOROTA_DB=/data/volorota.db \
+    -e VOLOROTA_ADMIN_PASSWORD=test-only-password \
     "$IMAGE"
 }
 
