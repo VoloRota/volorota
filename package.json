@@ -1,0 +1,22 @@
+{
+  "name": "volorota",
+  "description": "Self-hosted volunteer scheduling for churches. A roster of the willing.",
+  "license": "AGPL-3.0-only",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "hono": "^4.12.25"
+  }
+}
