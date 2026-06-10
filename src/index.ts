@@ -5,6 +5,7 @@ import { peopleRouter } from "./routes/people.js";
 import { teamsRouter } from "./routes/teams.js";
 import { templatesRouter } from "./routes/templates.js";
 import { servicesRouter } from "./routes/services.js";
+import { makeHealthRouter } from "./routes/health.js";
 import { layout } from "./views/layout.js";
 import {
   validateAuthConfig,
@@ -22,6 +23,10 @@ if (authConfigError) {
   process.exit(1);
 }
 
+// Read version from package.json at startup (runtime, no bundler needed)
+const pkg = await Bun.file(new URL("../package.json", import.meta.url)).json() as { version: string };
+const appVersion: string = pkg.version;
+
 // Initialize DB on startup (side-effect: creates tables)
 getDb();
 
@@ -29,6 +34,9 @@ const app = new Hono<AuthEnv>();
 
 // Static files
 app.use("/static/*", serveStatic({ root: "./public", rewriteRequestPath: (p) => p.replace(/^\/static/, "") }));
+
+// Health check — public, outside the /admin auth gate
+app.route("/health", makeHealthRouter(appVersion));
 
 // Inject DB into context for auth middleware
 app.use("*", (c, next) => {
@@ -65,7 +73,13 @@ app.route("/admin/teams", teamsRouter);
 app.route("/admin/templates", templatesRouter);
 app.route("/admin/services", servicesRouter);
 
-const port = Number(process.env.PORT ?? 3000);
+// Env vars:
+//   VOLOROTA_PORT          — listening port (default: PORT ?? 3000)
+//   VOLOROTA_DB            — path to SQLite file (default: ./data/volorota.db)
+//   VOLOROTA_ADMIN_PASSWORD — required; admin login password
+//   VOLOROTA_SESSION_SECRET — optional; ≥32 chars, else generated and persisted in DB
+//   VOLOROTA_SMTP_HOST/PORT/USER/PASS — (arriving with notifications feature)
+const port = Number(process.env.VOLOROTA_PORT ?? process.env.PORT ?? 3000);
 
 export default {
   port,
