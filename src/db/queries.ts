@@ -851,3 +851,66 @@ export function lastServedDateByPerson(
 
   return new Map(rows.map((r) => [r.person_id, r.last_served]));
 }
+
+// ---------------------------------------------------------------------------
+// Service Notes (ISC-45, ISC-46)
+// ---------------------------------------------------------------------------
+
+export interface ServiceNote {
+  id: number;
+  service_id: number;
+  team_id: number | null;
+  body: string;
+  created_at: string;
+}
+
+/** Create a note attached to a service, optionally scoped to a team. */
+export function createServiceNote(
+  db: Database,
+  serviceId: number,
+  teamId: number | null,
+  body: string
+): ServiceNote {
+  return db
+    .prepare(
+      `INSERT INTO service_notes (service_id, team_id, body)
+       VALUES (?, ?, ?) RETURNING *`
+    )
+    .get(serviceId, teamId ?? null, body) as ServiceNote;
+}
+
+/** List all notes for a service (admin view — all teams). */
+export function listServiceNotes(
+  db: Database,
+  serviceId: number
+): ServiceNote[] {
+  return db
+    .query(
+      "SELECT * FROM service_notes WHERE service_id = ? ORDER BY created_at"
+    )
+    .all(serviceId) as ServiceNote[];
+}
+
+/**
+ * List notes relevant to a volunteer's assignment on a service.
+ * Returns service-wide notes (team_id IS NULL) plus notes scoped to the given team.
+ */
+export function listRelevantNotesForVolunteer(
+  db: Database,
+  serviceId: number,
+  teamId: number
+): ServiceNote[] {
+  return db
+    .query(
+      `SELECT * FROM service_notes
+       WHERE service_id = ? AND (team_id IS NULL OR team_id = ?)
+       ORDER BY created_at`
+    )
+    .all(serviceId, teamId) as ServiceNote[];
+}
+
+/** Delete a single note by id. */
+export function deleteServiceNote(db: Database, noteId: number): void {
+  db.prepare("DELETE FROM service_notes WHERE id = ?").run(noteId);
+}
+
