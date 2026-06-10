@@ -43,6 +43,7 @@ import {
 } from "../volunteer/tokens.js";
 import { sendMail, sendReplacementRequestEmail, sendLeaderNotification } from "../mail/mailer.js";
 import { escHtml } from "../views/layout.js";
+import { getConfirmedAssignments, buildIcsFeed } from "../calendar/ics.js";
 
 // ---------------------------------------------------------------------------
 // Note rendering helper (ISC-46)
@@ -288,6 +289,9 @@ volunteerRouter.get("/:token", async (c) => {
     )
     .join("");
 
+  const appBase = process.env.VOLOROTA_BASE_URL ?? "http://localhost:3000";
+  const calFeedUrl = `${appBase}/v/${escHtml(rawToken)}/calendar.ics`;
+
   const body = `
     ${msg ? `<div class="flash flash-success">${escHtml(msg)}</div>` : ""}
     ${err ? `<div class="flash flash-error">${escHtml(err)}</div>` : ""}
@@ -295,6 +299,14 @@ volunteerRouter.get("/:token", async (c) => {
     <div class="card">
       <h1>Hi, ${escHtml(person.name)}</h1>
       <p class="muted">Here are your upcoming assignments.</p>
+
+      <details style="margin:.4rem 0 .8rem">
+        <summary style="cursor:pointer;font-size:.9rem;color:#2980b9">Add to your calendar</summary>
+        <p style="font-size:.85rem;margin:.4rem 0 .2rem">Subscribe to your personal ICS feed in any calendar app
+           (Apple Calendar, Google Calendar, Outlook, etc.):</p>
+        <code style="font-size:.8rem;word-break:break-all;background:#f5f5f5;padding:.4rem .6rem;border-radius:4px;display:block">${calFeedUrl}</code>
+        <p style="font-size:.8rem;color:#888;margin:.3rem 0 0">Feed includes only your confirmed assignments and updates automatically.</p>
+      </details>
 
       <h2>Upcoming Assignments</h2>
       <table>
@@ -768,6 +780,37 @@ volunteerRouter.post("/:token/blockouts/:bid/delete", async (c) => {
 
   deleteBlockout(db, blockoutId);
   return c.redirect(`/v/${rawToken}?msg=Blockout+removed`);
+});
+
+// ---------------------------------------------------------------------------
+// GET /v/:token/calendar.ics — private ICS feed (confirmed assignments only)
+// Same token validation as all other /v/:token routes (ISC-37)
+// ---------------------------------------------------------------------------
+
+volunteerRouter.get("/:token/calendar.ics", async (c) => {
+  const db = getDb();
+  const rawToken = c.req.param("token");
+  const personId = await resolveToken(db, rawToken);
+
+  if (personId === null) {
+    // Return a minimal error ICS rather than HTML so calendar clients get a
+    // clear 410 status code (same semantics as the rest of /v/:token)
+    return new Response("Token expired or invalid", { status: 410 });
+  }
+
+  const assignments = getConfirmedAssignments(db, personId);
+  const appBase = process.env.VOLOROTA_BASE_URL ?? "http://localhost:3000";
+  const volunteerLink = `${appBase}/v/${rawToken}`;
+  const ics = buildIcsFeed(assignments, volunteerLink);
+
+  return new Response(ics, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/calendar; charset=utf-8",
+      "Cache-Control": "no-cache, no-store",
+      "Content-Disposition": 'attachment; filename="volorota.ics"',
+    },
+  });
 });
 
 // ---------------------------------------------------------------------------

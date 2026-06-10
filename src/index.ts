@@ -11,6 +11,7 @@ import { makeHealthRouter } from "./routes/health.js";
 import { volunteerRouter } from "./routes/volunteer.js";
 import { adminVolunteerRouter } from "./routes/admin-volunteer.js";
 import { outboxRouter } from "./routes/outbox.js";
+import { exportRouter, printRouter } from "./routes/export.js";
 import { layout } from "./views/layout.js";
 import {
   validateAuthConfig,
@@ -105,6 +106,9 @@ app.route("/admin/people", peopleRouter);
 app.route("/admin/people", blockoutsRouter);
 app.route("/admin/teams", teamsRouter);
 app.route("/admin/templates", templatesRouter);
+// exportRouter must mount before servicesRouter: its literal /export.csv
+// would otherwise be swallowed by servicesRouter's /:id param route
+app.route("/admin/services", exportRouter);
 app.route("/admin/services", servicesRouter);
 app.route("/admin/matrix", matrixRouter);
 app.route("/admin/outbox", outboxRouter);
@@ -112,6 +116,9 @@ app.route("/admin/outbox", outboxRouter);
 // Admin volunteer touchpoints (inside auth gate via /admin/* middleware above)
 app.route("/admin/people", adminVolunteerRouter);
 app.route("/admin/services", adminVolunteerRouter);
+
+// Print route (inside auth gate)
+app.route("/admin/print", printRouter);
 
 // Volunteer surface — OUTSIDE the admin auth gate
 app.route("/v", volunteerRouter);
@@ -121,7 +128,10 @@ app.route("/v", volunteerRouter);
 //   VOLOROTA_DB            — path to SQLite file (default: ./data/volorota.db)
 //   VOLOROTA_ADMIN_PASSWORD — required; admin login password
 //   VOLOROTA_SESSION_SECRET — optional; ≥32 chars, else generated and persisted in DB
-//   VOLOROTA_SMTP_HOST/PORT/USER/PASS — (arriving with notifications feature)
+//   VOLOROTA_SMTP_HOST/PORT/USER/PASS/FROM/SECURE — optional; capture mode when unset
+//   VOLOROTA_ADMIN_EMAIL   — optional; leader-notification fallback recipient
+//   VOLOROTA_REMINDER_DAYS — optional; default "3", comma-separated (e.g. "7,3")
+//   VOLOROTA_SERVICE_MINUTES — optional; ICS event duration, default 75
 const port = Number(process.env.VOLOROTA_PORT ?? process.env.PORT ?? 3000);
 
 export default {
