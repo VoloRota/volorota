@@ -12,6 +12,7 @@ export function layout(title: string, body: string): string {
 <body>
   <nav class="top-nav">
     <a class="brand" href="/admin">VoloRota</a>
+    <a href="/admin/matrix">Matrix</a>
     <a href="/admin/people">People</a>
     <a href="/admin/teams">Teams</a>
     <a href="/admin/templates">Templates</a>

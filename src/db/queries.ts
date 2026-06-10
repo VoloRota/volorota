@@ -621,6 +621,212 @@ export function blockedOutPersonIds(
   return new Set(rows.map((r) => r.person_id));
 }
 
+// ---------------------------------------------------------------------------
+// Matrix view queries
+// ---------------------------------------------------------------------------
+
+export interface MatrixService {
+  id: number;
+  date: string;
+  time: string;
+  name: string;
+}
+
+export interface MatrixRow {
+  slotKey: string;       // "teamId:roleName:position" — stable row identity
+  teamId: number;
+  teamName: string;
+  roleName: string;
+  position: number;      // 0-based within (team, role)
+  label: string;         // e.g. "Worship — Vocals 2"
+}
+
+export interface MatrixCell {
+  slotKey: string;
+  serviceId: number;
+  slotId: number | null;  // null = no slot exists for this service × row combo
+  personId: number | null;
+  personName: string | null;
+  status: "confirmed" | "pending" | "declined" | "unfilled" | "none";
+  // "none" means the service doesn't have this slot at all (sparse matrix)
+  blockedOut: boolean;
+}
+
+export interface MatrixData {
+  services: MatrixService[];
+  rows: MatrixRow[];
+  cells: Map<string, MatrixCell>;  // key = `${slotKey}::${serviceId}`
+}
+
+/**
+ * Fetch all data needed to render the matrix view for a window of services.
+ * Services are ordered by date asc; rows grouped by team → role → position.
+ * Single-pass data collection: 4 queries, no per-cell lookups.
+ *
+ * @param fromDate   YYYY-MM-DD — window start (inclusive)
+ * @param limit      max number of services to include (default 8)
+ */
+export function getMatrixData(
+  db: Database,
+  fromDate: string,
+  limit = 8
+): MatrixData {
+  // 1. Fetch the service window
+  const services = db
+    .query(
+      `SELECT id, date, time, name FROM services
+       WHERE date >= ? ORDER BY date, time LIMIT ?`
+    )
+    .all(fromDate, limit) as MatrixService[];
+
+  if (services.length === 0) {
+    return { services: [], rows: [], cells: new Map() };
+  }
+
+  const serviceIds = services.map((s) => s.id);
+  const placeholders = serviceIds.map(() => "?").join(",");
+
+  // 2. Fetch all slots for these services, with team names
+  const slotRows = db
+    .query(
+      `SELECT ss.id AS slot_id, ss.service_id, ss.team_id, ss.role_name, ss.position,
+              t.name AS team_name
+       FROM service_slots ss
+       JOIN teams t ON t.id = ss.team_id
+       WHERE ss.service_id IN (${placeholders})
+       ORDER BY t.name, ss.role_name, ss.position`
+    )
+    .all(...serviceIds) as Array<{
+      slot_id: number;
+      service_id: number;
+      team_id: number;
+      role_name: string;
+      position: number;
+      team_name: string;
+    }>;
+
+  // 3. Fetch all assignments for these slots
+  const slotIds = slotRows.map((r) => r.slot_id);
+  let assignmentMap = new Map<number, { person_id: number; person_name: string; status: string }>();
+
+  if (slotIds.length > 0) {
+    const assignPlaceholders = slotIds.map(() => "?").join(",");
+    const assignRows = db
+      .query(
+        `SELECT a.service_slot_id, a.person_id, a.status, p.name AS person_name
+         FROM assignments a
+         JOIN people p ON p.id = a.person_id
+         WHERE a.service_slot_id IN (${assignPlaceholders})`
+      )
+      .all(...slotIds) as Array<{
+        service_slot_id: number;
+        person_id: number;
+        status: string;
+        person_name: string;
+      }>;
+    for (const a of assignRows) {
+      assignmentMap.set(a.service_slot_id, {
+        person_id: a.person_id,
+        person_name: a.person_name,
+        status: a.status,
+      });
+    }
+  }
+
+  // 4. Fetch blockouts for all assigned persons across the service dates
+  const assignedPersonIds = [...new Set([...assignmentMap.values()].map((a) => a.person_id))];
+  const minDate = services[0]!.date;
+  const maxDate = services[services.length - 1]!.date;
+  const blockedOutSet = new Set<string>(); // "personId::date"
+
+  if (assignedPersonIds.length > 0) {
+    const bPlaceholders = assignedPersonIds.map(() => "?").join(",");
+    const blockoutRows = db
+      .query(
+        `SELECT person_id, start_date, end_date FROM blockouts
+         WHERE person_id IN (${bPlaceholders})
+           AND start_date <= ? AND end_date >= ?`
+      )
+      .all(...assignedPersonIds, maxDate, minDate) as Array<{
+        person_id: number;
+        start_date: string;
+        end_date: string;
+      }>;
+
+    // For each blockout range, mark each service date that falls within it
+    for (const bo of blockoutRows) {
+      for (const svc of services) {
+        if (svc.date >= bo.start_date && svc.date <= bo.end_date) {
+          blockedOutSet.add(`${bo.person_id}::${svc.date}`);
+        }
+      }
+    }
+  }
+
+  // Build the ordered set of unique row keys (team → role → position)
+  const rowMap = new Map<string, MatrixRow>();
+  for (const sr of slotRows) {
+    const key = `${sr.team_id}:${sr.role_name}:${sr.position}`;
+    if (!rowMap.has(key)) {
+      const posLabel = sr.position + 1; // 1-based for display
+      rowMap.set(key, {
+        slotKey: key,
+        teamId: sr.team_id,
+        teamName: sr.team_name,
+        roleName: sr.role_name,
+        position: sr.position,
+        label: `${sr.team_name} — ${sr.role_name} ${posLabel}`,
+      });
+    }
+  }
+  const rows = [...rowMap.values()];
+
+  // Build the cell map
+  const cells = new Map<string, MatrixCell>();
+
+  // Initialize all cells as "none" (slot doesn't exist for this service)
+  for (const row of rows) {
+    for (const svc of services) {
+      const cellKey = `${row.slotKey}::${svc.id}`;
+      cells.set(cellKey, {
+        slotKey: row.slotKey,
+        serviceId: svc.id,
+        slotId: null,
+        personId: null,
+        personName: null,
+        status: "none",
+        blockedOut: false,
+      });
+    }
+  }
+
+  // Fill in actual slot + assignment data
+  for (const sr of slotRows) {
+    const slotKey = `${sr.team_id}:${sr.role_name}:${sr.position}`;
+    const cellKey = `${slotKey}::${sr.service_id}`;
+    const assignment = assignmentMap.get(sr.slot_id) ?? null;
+    const svc = services.find((s) => s.id === sr.service_id)!;
+
+    const blockedOut = assignment
+      ? blockedOutSet.has(`${assignment.person_id}::${svc.date}`)
+      : false;
+
+    cells.set(cellKey, {
+      slotKey,
+      serviceId: sr.service_id,
+      slotId: sr.slot_id,
+      personId: assignment?.person_id ?? null,
+      personName: assignment?.person_name ?? null,
+      status: assignment
+        ? (assignment.status as "confirmed" | "pending" | "declined")
+        : "unfilled",
+      blockedOut,
+    });
+  }
+
+  return { services, rows, cells };
+}
+
 /**
  * Return person id → most recent non-declined assignment date within a team,
  * or null for members who have never been assigned (or only declined).

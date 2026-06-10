@@ -109,3 +109,246 @@ a:hover { text-decoration: underline; }
 .import-summary h3 { margin-bottom: 0.4rem; }
 .error-list { list-style: none; padding: 0; }
 .error-list li { background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; padding: 0.4rem 0.7rem; margin-bottom: 0.3rem; font-size: 0.87rem; }
+
+/* ---------------------------------------------------------------------------
+   Matrix view — ISC-16, ISC-17, ISC-18
+   --------------------------------------------------------------------------- */
+
+/* Outer wrapper: enables horizontal scroll without breaking sticky column */
+.matrix-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  margin-top: 1rem;
+  /* Do NOT set max-width here — let it fill the page naturally */
+}
+
+/* Override main's max-width constraint for the matrix page so wide grids breathe */
+.matrix-page main,
+main:has(.matrix-wrapper) {
+  max-width: 100%;
+  padding: 0 1rem;
+}
+
+.matrix-table {
+  /* separate, NOT collapse: position:sticky on th/td silently fails with
+     border-collapse:collapse in Chromium — labels scroll away with the table */
+  border-collapse: separate;
+  border-spacing: 0;
+  /* the generic `table { overflow: hidden }` (border-radius clipping) makes the
+     table the sticky containing block, so labels pin to the table instead of the
+     scrolling wrapper — must stay visible here */
+  overflow: visible;
+  border-radius: 0;
+  background: #fff;
+  /* min-content so table doesn't collapse on narrow screens */
+  width: max-content;
+  min-width: 100%;
+}
+
+/* ---- First column: role labels, sticky ---- */
+.matrix-row-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #f1f1f4;
+  border-right: 2px solid #d0d0d8;
+  min-width: 160px;
+  max-width: 200px;
+  padding: 0.45rem 0.75rem;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Corner header cell (top-left) */
+.matrix-corner {
+  z-index: 3; /* above column headers */
+  background: #e8e8ef;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #555;
+}
+
+.row-team {
+  display: block;
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 400;
+}
+.row-role {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #222;
+}
+.row-pos {
+  font-weight: 400;
+  color: #888;
+}
+
+/* ---- Column headers ---- */
+.matrix-col-header {
+  background: #f1f1f4;
+  border-bottom: 2px solid #d0d0d8;
+  text-align: center;
+  padding: 0.4rem 0.5rem;
+  min-width: 100px;
+  vertical-align: top;
+}
+
+.matrix-col-weekday {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: #777;
+  letter-spacing: .05em;
+}
+.matrix-col-date {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #222;
+}
+.matrix-col-name {
+  display: block;
+  font-size: 0.75rem;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+/* ---- Data cells ---- */
+.matrix-cell {
+  padding: 0.3rem 0.4rem;
+  text-align: center;
+  border-bottom: 1px solid #eee;
+  border-right: 1px solid #f0f0f0;
+  vertical-align: middle;
+  min-width: 90px;
+}
+
+.matrix-cell .cell-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  text-decoration: none;
+  color: inherit;
+}
+.matrix-cell .cell-link:hover {
+  text-decoration: underline;
+}
+
+.cell-symbol {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.cell-name {
+  font-size: 0.78rem;
+  line-height: 1.2;
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- State: confirmed --- */
+.cell-confirmed {
+  background: #d1fae5;
+  border-left: 3px solid #059669;
+  color: #065f46;
+}
+.cell-confirmed .cell-symbol { color: #059669; }
+
+/* --- State: pending --- */
+.cell-pending {
+  background: #fef3c7;
+  border-left: 3px solid #d97706;
+  color: #92400e;
+}
+.cell-pending .cell-symbol { color: #d97706; }
+
+/* --- State: declined --- */
+.cell-declined {
+  background: #fee2e2;
+  border-left: 3px solid #dc2626;
+  color: #991b1b;
+}
+.cell-declined .cell-symbol { color: #dc2626; }
+
+/* --- State: unfilled --- */
+.cell-unfilled {
+  background: #f9fafb;
+  border-left: 3px solid #9ca3af;
+  color: #6b7280;
+}
+.cell-unfilled .cell-symbol { color: #9ca3af; }
+
+/* --- State: none (service lacks this slot) --- */
+.cell-none {
+  background: #f3f4f6;
+  color: #c0c0c8;
+  border-left: 3px solid transparent;
+}
+
+/* --- Blocked-out conflict indicator --- */
+.cell-blocked {
+  /* Additional visual cue on top of state color: dashed border */
+  outline: 2px dashed #f59e0b;
+  outline-offset: -2px;
+}
+.cell-conflict {
+  font-size: 0.82rem;
+  color: #d97706;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+
+/* ---- Paging ---- */
+.matrix-paging {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0.5rem;
+  flex-wrap: wrap;
+}
+.matrix-paging-label {
+  font-size: 0.88rem;
+  color: #555;
+}
+
+/* ---- Legend ---- */
+.matrix-legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  margin-bottom: 0.5rem;
+  align-items: center;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+.legend-item.cell-confirmed { background: #d1fae5; color: #065f46; }
+.legend-item.cell-pending   { background: #fef3c7; color: #92400e; }
+.legend-item.cell-declined  { background: #fee2e2; color: #991b1b; }
+.legend-item.cell-unfilled  { background: #f9fafb; color: #6b7280; border: 1px solid #e5e7eb; }
+
+/* ---- Responsive: compact cells at narrow widths ---- */
+@media (max-width: 768px) {
+  .matrix-col-header  { min-width: 72px; padding: 0.3rem 0.25rem; }
+  .matrix-cell        { min-width: 72px; padding: 0.25rem 0.2rem; }
+  .cell-name          { font-size: 0.72rem; max-width: 68px; }
+  .matrix-row-label   { min-width: 120px; padding: 0.35rem 0.5rem; }
+  .matrix-col-name    { max-width: 70px; }
+}

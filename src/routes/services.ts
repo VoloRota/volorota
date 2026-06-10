@@ -111,6 +111,7 @@ servicesRouter.get("/", (c) => {
       </form>
     </div>
 
+    <p><a href="/admin/matrix">&rarr; Matrix View</a> — see all upcoming assignments at a glance</p>
     <h2>All Services (${services.length})</h2>
     <table>
       <thead><tr><th>Name</th><th>Date</th><th>Time</th><th>Type</th></tr></thead>
