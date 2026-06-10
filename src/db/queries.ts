@@ -827,6 +827,47 @@ export function getMatrixData(
   return { services, rows, cells };
 }
 
+// ---------------------------------------------------------------------------
+// Export queries
+// ---------------------------------------------------------------------------
+
+export interface ExportRow {
+  date: string;
+  time: string;
+  service: string;
+  team: string;
+  role: string;
+  position: number;
+  assignee: string | null;
+  status: string;
+}
+
+/**
+ * Return all service slots (with assignment data where present) for services
+ * within [fromDate, toDate] (both YYYY-MM-DD, inclusive).
+ * Unfilled slots have assignee = null and status = "unfilled".
+ */
+export function getExportRows(
+  db: Database,
+  fromDate: string,
+  toDate: string
+): ExportRow[] {
+  return db
+    .query(
+      `SELECT s.date, s.time, s.name AS service, t.name AS team,
+              ss.role_name AS role, ss.position,
+              p.name AS assignee, COALESCE(a.status, 'unfilled') AS status
+       FROM service_slots ss
+       JOIN services s ON s.id = ss.service_id
+       JOIN teams t ON t.id = ss.team_id
+       LEFT JOIN assignments a ON a.service_slot_id = ss.id
+       LEFT JOIN people p ON p.id = a.person_id
+       WHERE s.date >= ? AND s.date <= ?
+       ORDER BY s.date, s.time, t.name, ss.role_name, ss.position`
+    )
+    .all(fromDate, toDate) as ExportRow[];
+}
+
 /**
  * Return person id → most recent non-declined assignment date within a team,
  * or null for members who have never been assigned (or only declined).

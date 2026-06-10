@@ -114,7 +114,13 @@ servicesRouter.get("/", (c) => {
       </form>
     </div>
 
-    <p><a href="/admin/matrix">&rarr; Matrix View</a> — see all upcoming assignments at a glance</p>
+    <p>
+      <a href="/admin/matrix">&rarr; Matrix View</a> — see all upcoming assignments at a glance
+      &nbsp;|&nbsp;
+      <a href="/admin/print">&rarr; Print Schedule</a>
+      &nbsp;|&nbsp;
+      <a href="/admin/services/export.csv">&darr; Export CSV (all dates)</a>
+    </p>
     <h2>All Services (${services.length})</h2>
     <table>
       <thead><tr><th>Name</th><th>Date</th><th>Time</th><th>Type</th></tr></thead>

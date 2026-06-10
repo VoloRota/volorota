@@ -45,7 +45,11 @@ adminVolunteerRouter.get("/:id/volunteer-link", async (c) => {
        <p style="font-size:.85rem;word-break:break-all;background:#f5f5f5;padding:.5rem;border-radius:4px">
          ${escHtml(`${appBase}/v/[token hidden — regenerate to see]`)}
        </p>
-       <p style="font-size:.8rem;color:#888">Token is stored hashed. Regenerate to produce a new copyable link.</p>`
+       <p style="font-size:.8rem;color:#888">Token is stored hashed. Regenerate to produce a new copyable link.</p>
+       <p style="font-size:.85rem;margin-top:.8rem"><strong>Calendar feed URL</strong> (ICS — subscribe in any calendar app):</p>
+       <p style="font-size:.8rem;word-break:break-all;background:#f5f5f5;padding:.4rem .5rem;border-radius:4px">
+         ${escHtml(`${appBase}/v/[token]/calendar.ics — regenerate token to reveal the exact URL`)}
+       </p>`
     : `<p style="color:#888">No token issued yet. Regenerate to create one.</p>`;
 
   const body = `
@@ -80,6 +84,7 @@ adminVolunteerRouter.post("/:id/volunteer-link/regenerate", async (c) => {
   const rawToken = await createOrReplaceToken(db, personId);
   const appBase = process.env.VOLOROTA_BASE_URL ?? "http://localhost:3000";
   const magicLink = `${appBase}/v/${rawToken}`;
+  const calFeedUrl = `${appBase}/v/${rawToken}/calendar.ics`;
 
   const body = `
     <h1>Volunteer Link — ${escHtml(person.name)}</h1>
@@ -90,6 +95,11 @@ adminVolunteerRouter.post("/:id/volunteer-link/regenerate", async (c) => {
         <a href="${escHtml(magicLink)}">${escHtml(magicLink)}</a>
       </p>
       <p style="font-size:.8rem;color:#888">This link is only shown once. Regenerate again if needed.</p>
+      <p style="margin-top:.8rem"><strong>Calendar Feed URL</strong> (ICS — for calendar app subscription)</p>
+      <p style="word-break:break-all;background:#f5f5f5;padding:.6rem;border-radius:4px;font-size:.85rem">
+        ${escHtml(calFeedUrl)}
+      </p>
+      <p style="font-size:.8rem;color:#888">Share this URL with ${escHtml(person.name)} to let them subscribe in Apple Calendar, Google Calendar, Outlook, etc.</p>
     </div>
     <p><a href="/admin/people">&larr; Back to People</a></p>`;
 
