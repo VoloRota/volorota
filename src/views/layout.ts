@@ -1,0 +1,37 @@
+/** Minimal server-rendered HTML helpers — no React, no client framework. */
+
+export function layout(title: string, body: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escHtml(title)} — VoloRota</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <nav class="top-nav">
+    <a class="brand" href="/admin">VoloRota</a>
+    <a href="/admin/people">People</a>
+    <a href="/admin/teams">Teams</a>
+    <a href="/admin/templates">Templates</a>
+    <a href="/admin/services">Services</a>
+  </nav>
+  <main>${body}</main>
+</body>
+</html>`;
+}
+
+export function escHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function flash(msg: string | null, type: "error" | "success" = "success"): string {
+  if (!msg) return "";
+  return `<div class="flash flash-${escHtml(type)}">${escHtml(msg)}</div>`;
+}
