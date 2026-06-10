@@ -1,5 +1,5 @@
 /**
- * Mailer abstraction — ISC-27, ISC-30
+ * Mailer abstraction — ISC-27, ISC-30, ISC-31
  *
  * Interface: sendMail({ to, subject, text, html? })
  *
@@ -7,11 +7,12 @@
  *   - Appends to an in-memory array accessible to tests.
  *   - Also writes to the `outbox` table in SQLite (admin-viewable).
  *
- * Notifications feature (future) plugs SMTP in by calling setTransport().
+ * Notifications feature plugs SMTP in by calling setTransport().
  *
  * Assignment helpers:
  *   sendAssignmentEmail(db, assignmentId)  — called from admin "Notify" action
  *   sendReplacementRequestEmail(db, replacementRequestId, toPersonId)
+ *   sendLeaderNotification(db, assignmentId, eventType) — ISC-31: notify team leader
  */
 
 import type { Database } from "bun:sqlite";
@@ -62,8 +63,8 @@ const captureTransport: MailTransport = {
     // Persist to outbox table (if it exists — it's created by extendSchemaForVolunteer)
     try {
       db.prepare(
-        `INSERT INTO outbox (to_email, subject, body_text, body_html)
-         VALUES (?, ?, ?, ?)`
+        `INSERT INTO outbox (to_email, subject, body_text, body_html, transport, status)
+         VALUES (?, ?, ?, ?, 'capture', 'sent')`
       ).run(msg.to, msg.subject, msg.text, msg.html ?? null);
     } catch {
       // outbox table may not exist in minimal test setups — silently skip
@@ -240,6 +241,139 @@ export async function sendReplacementRequestEmail(
   `;
 
   await sendMail(db, { to: toPerson.email, subject, text, html });
+}
+
+// ---------------------------------------------------------------------------
+// Leader notification — ISC-31
+// ---------------------------------------------------------------------------
+
+/**
+ * Notify the team leader when a volunteer declines or a replacement is accepted.
+ *
+ * Recipient resolution order:
+ *  1. Team's leader_person_id → that person's email
+ *  2. VOLOROTA_ADMIN_EMAIL env var
+ *  3. Write an outbox row with status 'skipped_no_recipient' — never silently drop.
+ *
+ * eventType: 'declined' | 'replacement_accepted'
+ * coverPersonId: when eventType is 'replacement_accepted', the ID of the covering volunteer
+ */
+export async function sendLeaderNotification(
+  db: Database,
+  assignmentId: number,
+  eventType: "declined" | "replacement_accepted",
+  coverPersonId?: number
+): Promise<void> {
+  // Resolve assignment → slot → service → team
+  const assignment = getAssignment(db, assignmentId);
+  if (!assignment) throw new Error(`Assignment ${assignmentId} not found`);
+
+  const slot = db
+    .query("SELECT * FROM service_slots WHERE id = ?")
+    .get(assignment.service_slot_id) as {
+    id: number;
+    service_id: number;
+    team_id: number;
+    role_name: string;
+  } | null;
+  if (!slot) throw new Error(`Slot ${assignment.service_slot_id} not found`);
+
+  const service = getService(db, slot.service_id);
+  if (!service) throw new Error(`Service ${slot.service_id} not found`);
+
+  // Resolve the volunteer who declined
+  const volunteer = db
+    .query("SELECT * FROM people WHERE id = ?")
+    .get(assignment.person_id) as { id: number; name: string; email: string } | null;
+  if (!volunteer) throw new Error(`Person ${assignment.person_id} not found`);
+
+  // Resolve the team leader
+  const team = db
+    .query("SELECT * FROM teams WHERE id = ?")
+    .get(slot.team_id) as {
+    id: number;
+    name: string;
+    leader_person_id: number | null;
+  } | null;
+  if (!team) throw new Error(`Team ${slot.team_id} not found`);
+
+  // Recipient resolution
+  let leaderEmail: string | null = null;
+
+  if (team.leader_person_id !== null) {
+    const leader = db
+      .query("SELECT * FROM people WHERE id = ?")
+      .get(team.leader_person_id) as { id: number; name: string; email: string } | null;
+    if (leader) leaderEmail = leader.email;
+  }
+
+  if (!leaderEmail) {
+    leaderEmail = process.env.VOLOROTA_ADMIN_EMAIL ?? null;
+  }
+
+  if (!leaderEmail) {
+    // Record a skip in the outbox — never silently drop
+    try {
+      db.prepare(
+        `INSERT INTO outbox (to_email, subject, body_text, transport, status)
+         VALUES (?, ?, ?, 'capture', 'skipped_no_recipient')`
+      ).run(
+        "",
+        `Leader notification skipped — no recipient (assignment ${assignmentId})`,
+        `Event: ${eventType}, service: ${service.name} on ${service.date}, volunteer: ${volunteer.name}`
+      );
+    } catch {
+      // Minimal test setup — log and continue
+      console.warn(
+        `[mail] Leader notification skipped (no recipient): assignment=${assignmentId} event=${eventType}`
+      );
+    }
+    return;
+  }
+
+  // Build the message body
+  let subject: string;
+  let text: string;
+
+  if (eventType === "declined") {
+    subject = `[VoloRota] Volunteer declined: ${service.name} on ${service.date}`;
+    text = [
+      `Team leader notification:`,
+      "",
+      `${volunteer.name} has declined their assignment.`,
+      "",
+      `Service: ${service.name}`,
+      `Date: ${service.date} at ${service.time}`,
+      `Role: ${slot.role_name}`,
+      `Team: ${team.name}`,
+      "",
+      `You may need to find a replacement volunteer for this slot.`,
+    ].join("\n");
+  } else {
+    // replacement_accepted
+    let coverName = "Unknown";
+    if (coverPersonId) {
+      const cover = db
+        .query("SELECT * FROM people WHERE id = ?")
+        .get(coverPersonId) as { id: number; name: string } | null;
+      if (cover) coverName = cover.name;
+    }
+    subject = `[VoloRota] Replacement confirmed: ${service.name} on ${service.date}`;
+    text = [
+      `Team leader notification:`,
+      "",
+      `${volunteer.name} declined and ${coverName} has agreed to cover.`,
+      "",
+      `Service: ${service.name}`,
+      `Date: ${service.date} at ${service.time}`,
+      `Role: ${slot.role_name}`,
+      `Team: ${team.name}`,
+      "",
+      `The slot is now confirmed under ${coverName}.`,
+    ].join("\n");
+  }
+
+  await sendMail(db, { to: leaderEmail, subject, text });
 }
 
 // ---------------------------------------------------------------------------

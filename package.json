@@ -12,12 +12,14 @@
     "test": "bun test"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/nodemailer": "^8.0.0"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "hono": "^4.12.25"
+    "hono": "^4.12.25",
+    "nodemailer": "^8.0.11"
   }
 }

@@ -38,11 +38,13 @@ export function extendSchemaForVolunteer(db: Database): void {
 
     CREATE TABLE IF NOT EXISTS outbox (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      to_email    TEXT NOT NULL,
-      subject     TEXT NOT NULL,
-      body_text   TEXT NOT NULL,
+      to_email    TEXT    NOT NULL,
+      subject     TEXT    NOT NULL,
+      body_text   TEXT    NOT NULL,
       body_html   TEXT,
-      sent_at     TEXT NOT NULL DEFAULT (datetime('now'))
+      transport   TEXT    NOT NULL DEFAULT 'capture',
+      status      TEXT    NOT NULL DEFAULT 'sent',
+      sent_at     TEXT    NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS replacement_requests (
@@ -53,7 +55,30 @@ export function extendSchemaForVolunteer(db: Database): void {
                             CHECK(status IN ('pending','accepted','cancelled')),
       created_at           TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS reminders_sent (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      assignment_id  INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+      reminder_day   INTEGER NOT NULL,
+      sent_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(assignment_id, reminder_day)
+    );
   `);
+
+  // Idempotent migration: add leader_person_id to teams if not present
+  const teamCols = db.query("PRAGMA table_info(teams)").all() as Array<{ name: string }>;
+  if (!teamCols.find((c) => c.name === "leader_person_id")) {
+    db.exec("ALTER TABLE teams ADD COLUMN leader_person_id INTEGER REFERENCES people(id) ON DELETE SET NULL");
+  }
+
+  // Idempotent migration: add transport + status columns to outbox if not present
+  const outboxCols = db.query("PRAGMA table_info(outbox)").all() as Array<{ name: string }>;
+  if (!outboxCols.find((c) => c.name === "transport")) {
+    db.exec("ALTER TABLE outbox ADD COLUMN transport TEXT NOT NULL DEFAULT 'capture'");
+  }
+  if (!outboxCols.find((c) => c.name === "status")) {
+    db.exec("ALTER TABLE outbox ADD COLUMN status TEXT NOT NULL DEFAULT 'sent'");
+  }
 }
 
 // ---------------------------------------------------------------------------

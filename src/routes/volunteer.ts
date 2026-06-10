@@ -41,7 +41,7 @@ import {
   lookupTokenNoExpiry,
   createOrReplaceToken,
 } from "../volunteer/tokens.js";
-import { sendMail, sendReplacementRequestEmail } from "../mail/mailer.js";
+import { sendMail, sendReplacementRequestEmail, sendLeaderNotification } from "../mail/mailer.js";
 import { escHtml } from "../views/layout.js";
 
 // ---------------------------------------------------------------------------
@@ -387,6 +387,13 @@ volunteerRouter.post("/:token/assignments/:id/decline", async (c) => {
 
   updateAssignmentStatus(db, assignmentId, "declined");
 
+  // ISC-31: notify team leader of decline (fire-and-forget; non-fatal)
+  try {
+    await sendLeaderNotification(db, assignmentId, "declined");
+  } catch (e) {
+    console.error("Failed to send leader decline notification:", e);
+  }
+
   // Find eligible replacement teammates (ISC-29)
   // Eligible = same team, not blocked out on service date, not already assigned in this service
   const slot = db
@@ -686,6 +693,28 @@ volunteerRouter.post("/:token/replacement/:rrId/accept", async (c) => {
     `INSERT INTO assignments (service_slot_id, person_id, status)
      VALUES (?, ?, 'confirmed')`
   ).run(originalAssignment.service_slot_id, personId);
+
+  // ISC-31: notify team leader of replacement acceptance (fire-and-forget; non-fatal)
+  // We notify based on the original assignment (which is now deleted, but the slot/team info
+  // is still accessible). Since the assignment row was deleted, we need to reconstruct enough
+  // context. We pass the original assignment id but note it may be gone — sendLeaderNotification
+  // must handle this gracefully or we use a different approach.
+  // Better: notify with the NEW assignment (coverPersonId = personId).
+  // Find the new assignment for the slot.
+  try {
+    const newAssignment = db
+      .query(
+        "SELECT * FROM assignments WHERE service_slot_id = ? AND person_id = ? AND status = 'confirmed'"
+      )
+      .get(originalAssignment.service_slot_id, personId) as {
+      id: number;
+    } | null;
+    if (newAssignment) {
+      await sendLeaderNotification(db, newAssignment.id, "replacement_accepted", personId);
+    }
+  } catch (e) {
+    console.error("Failed to send leader replacement notification:", e);
+  }
 
   return c.redirect(
     `/v/${rawToken}/replacement/${rrId}?msg=You%27re+confirmed%21+See+you+there.`
