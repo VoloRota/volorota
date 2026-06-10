@@ -92,7 +92,8 @@ teamsRouter.post("/", async (c) => {
 teamsRouter.get("/:id", (c) => {
   const db = getDb();
   const id = Number(c.req.param("id"));
-  const team = getTeam(db, id);
+  // Cast to include leader_person_id which is added via idempotent migration
+  const team = getTeam(db, id) as (ReturnType<typeof getTeam> & { leader_person_id?: number | null }) | null;
   if (!team) return c.notFound();
 
   const roles = listTeamRoles(db, id);
@@ -101,6 +102,7 @@ teamsRouter.get("/:id", (c) => {
   const nonMembers = allPeople.filter((p) => !members.find((m) => m.id === p.id));
   const msg = c.req.query("msg") ?? null;
   const err = c.req.query("err") ?? null;
+  const currentLeaderId: number | null = (team as any).leader_person_id ?? null;
 
   const roleRows = roles
     .map(
@@ -235,9 +237,46 @@ teamsRouter.get("/:id", (c) => {
         : `<p style="font-size:.85rem;color:#888">All people are already members, or there are no people yet.</p>`
     }
 
+    <h2>Team Leader</h2>
+    <div class="card">
+      <p class="muted" style="margin:0 0 .6rem">
+        The team leader receives email notifications when a volunteer declines or a replacement is confirmed.
+        ${currentLeaderId
+          ? `Current leader: <strong>${escHtml(members.find((m) => m.id === currentLeaderId)?.name ?? "(unknown)")}</strong>`
+          : `<em>None set — admin email will be used as fallback (or notifications skipped if unconfigured).</em>`
+        }
+      </p>
+      <form method="POST" action="/admin/teams/${id}/leader" style="flex-direction:row;gap:.6rem;align-items:center">
+        <select name="leader_person_id">
+          <option value="">— None —</option>
+          ${members.map((p) => `<option value="${p.id}"${p.id === currentLeaderId ? " selected" : ""}>${escHtml(p.name)}</option>`).join("")}
+        </select>
+        <button type="submit" class="btn btn-sm">Set Leader</button>
+      </form>
+    </div>
+
     ${crewSection}`;
 
   return c.html(layout(`Team: ${team.name}`, body));
+});
+
+// Set team leader (ISC-31)
+teamsRouter.post("/:id/leader", async (c) => {
+  const db = getDb();
+  const id = Number(c.req.param("id"));
+  const body = await c.req.parseBody();
+  const leaderPersonIdRaw = String(body["leader_person_id"] ?? "").trim();
+  const leaderPersonId = leaderPersonIdRaw ? Number(leaderPersonIdRaw) : null;
+
+  if (leaderPersonId && isNaN(leaderPersonId)) {
+    return c.redirect(`/admin/teams/${id}?err=Invalid+leader+selection`);
+  }
+
+  db.prepare("UPDATE teams SET leader_person_id = ? WHERE id = ?").run(
+    leaderPersonId,
+    id
+  );
+  return c.redirect(`/admin/teams/${id}?msg=Team+leader+updated`);
 });
 
 // Add role

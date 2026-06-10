@@ -10,6 +10,7 @@ import { matrixRouter } from "./routes/matrix.js";
 import { makeHealthRouter } from "./routes/health.js";
 import { volunteerRouter } from "./routes/volunteer.js";
 import { adminVolunteerRouter } from "./routes/admin-volunteer.js";
+import { outboxRouter } from "./routes/outbox.js";
 import { layout } from "./views/layout.js";
 import {
   validateAuthConfig,
@@ -19,6 +20,9 @@ import {
   handleLogout,
   type AuthEnv,
 } from "./auth.js";
+import { setTransport } from "./mail/mailer.js";
+import { buildSmtpTransportFromEnv } from "./mail/smtp.js";
+import { runReminderCheck } from "./notifications/reminders.js";
 
 // Validate required env vars — refuse to start if missing
 const authConfigError = validateAuthConfig();
@@ -33,6 +37,21 @@ const appVersion: string = pkg.version;
 
 // Initialize DB on startup (side-effect: creates tables)
 getDb();
+
+// Activate SMTP transport if configured (ISC-34)
+const smtpTransport = buildSmtpTransportFromEnv();
+if (smtpTransport) {
+  setTransport(smtpTransport);
+}
+
+// Start reminder check loop (ISC-35) — every 15 minutes
+// ONLY started here (server startup), never on module import
+const REMINDER_INTERVAL_MS = 15 * 60 * 1000;
+setInterval(() => {
+  runReminderCheck(getDb(), new Date()).catch((err) => {
+    console.error("[reminders] Check failed:", err);
+  });
+}, REMINDER_INTERVAL_MS);
 
 const app = new Hono<AuthEnv>();
 
@@ -59,8 +78,16 @@ app.use("/admin/*", authMiddleware);
 // Admin redirect
 app.get("/", (c) => c.redirect("/admin"));
 app.get("/admin", (c) => {
+  const isCaptureMode = !process.env.VOLOROTA_SMTP_HOST;
+  const captureBanner = isCaptureMode
+    ? `<div class="flash flash-info" style="margin:.5rem 0 1rem">
+         <strong>Capture mode:</strong> SMTP not configured — emails are captured, not delivered.
+         <a href="/admin/outbox">View outbox</a>
+       </div>`
+    : "";
   const body = `
     <h1>VoloRota Admin</h1>
+    ${captureBanner}
     <p>Welcome to the VoloRota church volunteer scheduler.</p>
     <ul>
       <li><a href="/admin/matrix">Matrix View</a> — see all upcoming assignments at a glance</li>
@@ -68,6 +95,7 @@ app.get("/admin", (c) => {
       <li><a href="/admin/teams">Teams</a> — define teams, roles, and crew assignments</li>
       <li><a href="/admin/templates">Templates</a> — configure recurring service schedules</li>
       <li><a href="/admin/services">Services</a> — generate and manage service instances</li>
+      <li><a href="/admin/outbox">Email Outbox</a> — view sent emails and capture log</li>
     </ul>`;
   return c.html(layout("Dashboard", body));
 });
@@ -79,6 +107,7 @@ app.route("/admin/teams", teamsRouter);
 app.route("/admin/templates", templatesRouter);
 app.route("/admin/services", servicesRouter);
 app.route("/admin/matrix", matrixRouter);
+app.route("/admin/outbox", outboxRouter);
 
 // Admin volunteer touchpoints (inside auth gate via /admin/* middleware above)
 app.route("/admin/people", adminVolunteerRouter);
