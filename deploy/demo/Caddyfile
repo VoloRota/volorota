@@ -1,0 +1,14 @@
+# Apex redirects to the demo until a proper landing page exists
+volorota.org {
+	redir https://{$DEMO_DOMAIN}{uri} permanent
+}
+
+{$DEMO_DOMAIN} {
+	reverse_proxy volorota:3000
+	header {
+		# The session cookie's `secure` flag is left to the proxy (see src/auth.ts)
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
