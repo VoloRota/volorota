@@ -1,0 +1,9 @@
+[Unit]
+Description=Reset the VoloRota demo to seed state
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/volorota/deploy/demo
+ExecStart=/opt/volorota/deploy/demo/reset.sh

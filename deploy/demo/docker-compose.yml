@@ -1,0 +1,40 @@
+# VoloRota public demo stack.
+#
+# Note: the PRODUCT is single-container (see the root docker-compose.yml — one
+# service, by design). This file is a DEPLOYMENT of that product: the second
+# service here is Caddy terminating TLS in front of it, which a church using
+# an existing reverse proxy would not need.
+services:
+  volorota:
+    build:
+      context: ../..
+    image: volorota:demo
+    restart: unless-stopped
+    volumes:
+      - volorota-demo-data:/data
+    environment:
+      VOLOROTA_DB: /data/volorota.db
+      VOLOROTA_ADMIN_PASSWORD: ${VOLOROTA_ADMIN_PASSWORD:?set in .env}
+      # Deliberately NO VOLOROTA_SMTP_* — the app runs in capture mode:
+      # every "sent" email lands in the admin-visible outbox instead of
+      # leaving the box. That is the demo's mail sandbox (ISC-44).
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DEMO_DOMAIN: ${DEMO_DOMAIN:?set in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  volorota-demo-data:
+  caddy-data:
+  caddy-config:
