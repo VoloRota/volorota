@@ -113,13 +113,48 @@ You now have a published schedule. Total time: ~15 minutes for a typical roster.
 | `VOLOROTA_DB` | `./data/volorota.db` (host), `/data/volorota.db` (container) | SQLite database path |
 | `VOLOROTA_ADMIN_PASSWORD` | — | **Required.** Admin console password; server refuses to start without it |
 | `VOLOROTA_SESSION_SECRET` | auto | Optional session-signing secret (≥32 chars); generated and persisted in the DB if unset |
-| `VOLOROTA_SESSION_SECRET` | — | *(arriving with Auth feature)* Cookie signing secret |
-| `VOLOROTA_SMTP_HOST` | — | *(arriving with Notifications feature)* SMTP relay host |
-| `VOLOROTA_SMTP_PORT` | — | SMTP port |
+| `VOLOROTA_SMTP_HOST` | — | SMTP relay host; without it the app runs in capture mode (see [Email setup](#email-setup)) |
+| `VOLOROTA_SMTP_PORT` | `587` | SMTP port |
 | `VOLOROTA_SMTP_USER` | — | SMTP username |
 | `VOLOROTA_SMTP_PASS` | — | SMTP password |
+| `VOLOROTA_SMTP_FROM` | — | From address on outgoing mail |
+| `VOLOROTA_SMTP_SECURE` | `false` | `true` for implicit TLS (port 465); leave `false` for STARTTLS on 587 |
+| `VOLOROTA_ADMIN_EMAIL` | — | Fallback recipient for leader notifications when a team has no leader set |
+| `VOLOROTA_REMINDER_DAYS` | `3` | Days before a service to email confirmed volunteers; comma-separated for multiple (e.g. `7,3`) |
+| `VOLOROTA_SERVICE_MINUTES` | `75` | Event duration used in volunteers' calendar feeds |
 
 All persistent state lives under one directory (`/data` in-container). Mount a Docker volume there and your data survives container recreation.
+
+---
+
+## Email setup
+
+VoloRota sends assignment notices, decline/replacement alerts to team leaders, and reminders. Without SMTP configured it runs in **capture mode**: nothing leaves the server, every "sent" email is viewable at `/admin/outbox`, and the dashboard shows a banner saying so. That's fine for evaluating; configure a relay before volunteers rely on it.
+
+Any standard SMTP relay works. The app reads the `VOLOROTA_SMTP_*` variables at startup — no other configuration.
+
+### Worked example: Gmail
+
+Gmail is the relay most small churches reach for. Two things to know up front: Google requires an **App Password** (your regular Gmail password will not work), and Gmail rewrites the From address to the authenticated account, so set `VOLOROTA_SMTP_FROM` to the same address.
+
+1. On the Google account you'll send from, turn on **2-Step Verification** (Google account → Security). App Passwords require it.
+2. Generate an App Password at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) — name it "VoloRota", copy the 16-character password.
+3. Add the variables to your compose file (or `docker run -e` flags):
+
+```yaml
+environment:
+  VOLOROTA_SMTP_HOST: smtp.gmail.com
+  VOLOROTA_SMTP_PORT: "587"
+  VOLOROTA_SMTP_USER: church.office@gmail.com
+  VOLOROTA_SMTP_PASS: "abcd efgh ijkl mnop"   # the App Password
+  VOLOROTA_SMTP_FROM: church.office@gmail.com
+```
+
+4. Restart the container. The capture-mode banner disappears; sends now show `transport: smtp` in `/admin/outbox`.
+
+To verify: open a service, click **Notify volunteers**, and check both the recipient's inbox and `/admin/outbox`.
+
+Consumer Gmail allows roughly 500 outgoing messages a day — far more than a small church's scheduling traffic. Note that routing mail through Gmail means Google processes your notification emails; if that matters to your congregation, the same five variables point at any other provider (Fastmail, Mailbox.org, Amazon SES, or your own relay) unchanged.
 
 ---
 
