@@ -955,3 +955,136 @@ export function deleteServiceNote(db: Database, noteId: number): void {
   db.prepare("DELETE FROM service_notes WHERE id = ?").run(noteId);
 }
 
+// ---------------------------------------------------------------------------
+// Role Qualifications (ISC-53)
+//
+// Default-open contract: a member with NO rows in this table is qualified for
+// ALL roles on that team.  A row exists only when a restriction is in effect.
+// ---------------------------------------------------------------------------
+
+export interface MemberRoleQualification {
+  team_id: number;
+  person_id: number;
+  role_name: string;
+}
+
+/**
+ * Return the set of role names a person is explicitly qualified for within a team.
+ * An empty set means the person has no restriction rows — i.e. qualified for ALL roles.
+ * Callers MUST check against listTeamRoles to determine actual reachable roles.
+ */
+export function listMemberQualifications(
+  db: Database,
+  teamId: number,
+  personId: number
+): string[] {
+  const rows = db
+    .query(
+      `SELECT role_name FROM member_role_qualifications
+       WHERE team_id = ? AND person_id = ?`
+    )
+    .all(teamId, personId) as Array<{ role_name: string }>;
+  return rows.map((r) => r.role_name);
+}
+
+/**
+ * Return all qualification rows for a team, keyed by person_id.
+ * Used by the engine to batch-load qualifications rather than per-candidate queries.
+ * Map value: Set<string> of qualified role names.  If a person_id is absent from
+ * the map they have no restriction rows → qualified for all roles.
+ */
+export function listTeamQualifications(
+  db: Database,
+  teamId: number
+): Map<number, Set<string>> {
+  const rows = db
+    .query(
+      `SELECT person_id, role_name FROM member_role_qualifications
+       WHERE team_id = ?`
+    )
+    .all(teamId) as Array<{ person_id: number; role_name: string }>;
+
+  const result = new Map<number, Set<string>>();
+  for (const row of rows) {
+    let set = result.get(row.person_id);
+    if (!set) {
+      set = new Set<string>();
+      result.set(row.person_id, set);
+    }
+    set.add(row.role_name);
+  }
+  return result;
+}
+
+/**
+ * Returns true if a person is qualified for a given role on a team.
+ *
+ * Default-open: if no qualification rows exist for this (team_id, person_id)
+ * pair at all, the person is qualified for every role.  Restriction only
+ * applies when at least one row exists (meaning the admin has opted in).
+ */
+export function isPersonQualifiedForRole(
+  db: Database,
+  teamId: number,
+  personId: number,
+  roleName: string
+): boolean {
+  // Check if any qualification rows exist for this member at all
+  const anyRow = db
+    .query(
+      `SELECT 1 FROM member_role_qualifications
+       WHERE team_id = ? AND person_id = ? LIMIT 1`
+    )
+    .get(teamId, personId);
+
+  if (!anyRow) {
+    // No restriction rows → default-open → qualified
+    return true;
+  }
+
+  // Restriction rows exist — check if this specific role is in the allowed set
+  const roleRow = db
+    .query(
+      `SELECT 1 FROM member_role_qualifications
+       WHERE team_id = ? AND person_id = ? AND role_name = ? LIMIT 1`
+    )
+    .get(teamId, personId, roleName);
+
+  return roleRow !== null;
+}
+
+/**
+ * Set the explicit qualification rows for a member on a team.
+ * Replaces all existing rows atomically.
+ *
+ * Pass an empty array to remove all restrictions (restoring default-open state).
+ * Pass a non-empty array to restrict to exactly those roles.
+ *
+ * Note: "all roles checked" in the UI is stored as NO rows (default-open),
+ * not as one row per role.  The UI derives the "all checked" visual state by
+ * comparing listMemberQualifications against listTeamRoles — if zero rows exist,
+ * all checkboxes render as checked.
+ */
+export function setMemberQualifications(
+  db: Database,
+  teamId: number,
+  personId: number,
+  qualifiedRoleNames: string[]
+): void {
+  // Delete existing rows for this member on this team
+  db.prepare(
+    `DELETE FROM member_role_qualifications WHERE team_id = ? AND person_id = ?`
+  ).run(teamId, personId);
+
+  // Insert new rows if any restrictions are provided
+  if (qualifiedRoleNames.length > 0) {
+    const insert = db.prepare(
+      `INSERT OR IGNORE INTO member_role_qualifications (team_id, person_id, role_name)
+       VALUES (?, ?, ?)`
+    );
+    for (const roleName of qualifiedRoleNames) {
+      insert.run(teamId, personId, roleName);
+    }
+  }
+}
+
