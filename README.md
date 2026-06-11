@@ -46,7 +46,7 @@ Open `http://localhost:3000` in a browser and sign in at the login page with the
 ### Option B — Docker Compose (recommended for self-hosting)
 
 ```bash
-git clone https://github.com/your-org/volorota.git
+git clone https://github.com/VoloRota/volorota.git
 cd volorota
 
 # Build the image
@@ -128,7 +128,7 @@ All persistent state lives under one directory (`/data` in-container). Mount a D
 **Prerequisites:** [Bun](https://bun.sh) >= 1.1
 
 ```bash
-git clone https://github.com/your-org/volorota.git
+git clone https://github.com/VoloRota/volorota.git
 cd volorota
 bun install
 ```
