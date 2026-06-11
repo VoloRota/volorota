@@ -25,5 +25,8 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  // deploy/ scripts run inside the container with /app absolute imports —
+  // deployment artifacts, not part of the typechecked build (ISC-2)
+  "exclude": ["node_modules", "deploy"]
 }
