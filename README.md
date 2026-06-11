@@ -151,10 +151,12 @@ environment:
   VOLOROTA_SMTP_FROM: church.office@gmail.com
 ```
 
-4. Set `VOLOROTA_BASE_URL` to your instance's public URL (e.g. `https://schedule.yourchurch.org`) — the links inside those emails are built from it.
+4. Set `VOLOROTA_BASE_URL` to your instance's public URL (e.g. `https://schedule.yourchurch.org`) — the links inside those emails are built from it. That URL has to actually reach your server: add a DNS record (an A record for `schedule` pointing at your server's IP, at whoever hosts your domain's DNS) and put TLS in front (a reverse proxy like Caddy — see `deploy/demo/` for a working example). DNS and TLS are outside VoloRota itself, but skipping them is the most common reason emailed links don't work.
 5. Restart the container. The capture-mode banner disappears; sends now show `transport: smtp` in `/admin/outbox`.
 
 To verify: open a service, click **Notify volunteers**, and check both the recipient's inbox and `/admin/outbox`.
+
+**Do the email domain and `VOLOROTA_BASE_URL` need to match?** No — they are independent. The From address is whatever your relay authenticates as; `VOLOROTA_BASE_URL` only controls where the links inside the emails point. Sending from `smallchurchoffice@gmail.com` with links to `https://schedule.smallchurch.org` works fine. If your church has Google Workspace on its own domain, the same App Password steps work there and the two will match — nice, but not required.
 
 Consumer Gmail allows roughly 500 outgoing messages a day — far more than a small church's scheduling traffic. Note that routing mail through Gmail means Google processes your notification emails; if that matters to your congregation, the same five variables point at any other provider (Fastmail, Mailbox.org, Amazon SES, or your own relay) unchanged.
 
