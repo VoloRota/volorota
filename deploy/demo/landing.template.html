@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoloRota — self-hosted volunteer scheduling for churches</title>
+<meta name="description" content="Open-source, self-hosted volunteer scheduling for churches. Volunteers accept, decline, and arrange replacements from emailed links — no accounts, no passwords. AGPL-3.0.">
+<style>
+  :root{--accent:#0f766e;--accent-dark:#115e59;--nav:#0f172a;--bg:#f8fafc;--text:#1e293b;--muted:#64748b;--line:#e2e8f0}
+  *{box-sizing:border-box;margin:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+  .wrap{max-width:880px;margin:0 auto;padding:0 1.25rem}
+  header{background:var(--nav);color:#fff;padding:.9rem 0}
+  header .wrap{display:flex;align-items:center;gap:.5rem}
+  .dot{width:.6rem;height:.6rem;border-radius:50%;background:#5eead4;display:inline-block}
+  .wordmark{font-weight:700;font-size:1.15rem}
+  header a{color:#cbd5e1;text-decoration:none;margin-left:auto}
+  .hero{padding:3.5rem 0 2.5rem;text-align:center}
+  .hero h1{font-size:2rem;line-height:1.25;margin-bottom: .75rem}
+  .hero p{color:var(--muted);max-width:560px;margin:0 auto 1.5rem;font-size:1.05rem}
+  .btns{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-block;padding:.7rem 1.4rem;border-radius:8px;text-decoration:none;font-weight:600}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{background:var(--accent-dark)}
+  .btn-secondary{background:#fff;color:var(--accent);border:1px solid var(--line)}
+  section{padding:2rem 0;border-top:1px solid var(--line)}
+  h2{font-size:1.25rem;margin-bottom:.75rem}
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;margin-top:1rem}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.1rem}
+  .card h3{font-size:1rem;margin-bottom:.4rem}
+  .card p{color:var(--muted);font-size:.92rem}
+  pre{background:var(--nav);color:#e2e8f0;border-radius:10px;padding:1rem;overflow-x:auto;font-size:.85rem;margin-top:.75rem}
+  .demo-creds{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.1rem;margin-top:1rem}
+  .demo-creds li{margin:.35rem 0 .35rem 1.2rem;overflow-wrap:anywhere}
+  .demo-creds code{background:var(--bg);padding:.1rem .4rem;border-radius:4px;font-size:.88em}
+  footer{padding:2rem 0 3rem;color:var(--muted);font-size:.85rem;text-align:center;border-top:1px solid var(--line)}
+  footer a{color:var(--accent)}
+</style>
+</head>
+<body>
+<header><div class="wrap"><span class="dot"></span><span class="wordmark">VoloRota</span><a href="https://github.com/VoloRota/volorota">GitHub</a></div></header>
+
+<div class="hero wrap">
+  <h1>Volunteer scheduling your church can own.</h1>
+  <p>Open-source and self-hosted. Auto-fill a fair rotation around blockout dates — then volunteers accept, decline, or arrange their own replacement from an emailed link. No accounts. No passwords. No monthly fee.</p>
+  <div class="btns">
+    <a class="btn btn-primary" href="https://demo.volorota.org">Try the live demo</a>
+    <a class="btn btn-secondary" href="https://github.com/VoloRota/volorota#quickstart">Self-host in 10 minutes</a>
+  </div>
+</div>
+
+<section><div class="wrap">
+  <h2>Why churches pick it</h2>
+  <div class="cols">
+    <div class="card"><h3>Volunteers never make accounts</h3><p>Every action — accept, decline, pick a replacement, set blockout dates, subscribe a calendar feed — happens through a private emailed link. Zero onboarding for the nursery team.</p></div>
+    <div class="card"><h3>Fair, explainable auto-fill</h3><p>Least-recently-served goes first, role qualifications are respected (your keys player is never scheduled on vocals), and nobody is double-booked across teams. Same data, same schedule, every time.</p></div>
+    <div class="card"><h3>Your data, your box</h3><p>One Docker container, one SQLite file, ~18&nbsp;MB of memory. No telemetry, no third-party requests, no vendor. AGPL-3.0 keeps it that way.</p></div>
+    <div class="card"><h3>Both ways churches schedule</h3><p>Individual rotation for nursery and sound; whole-crew rotation for worship teams ("Crew B has the 2nd Sunday") — with blockouts honored in both.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Poke the demo — you can't break it</h2>
+  <p style="color:var(--muted)">Fictional congregation, resets every hour. Open a volunteer link on your phone — that's the whole pitch.</p>
+  <div class="demo-creds">
+    <ul>
+      <li>Admin: <a href="https://demo.volorota.org">demo.volorota.org</a> — password <code>volorota-demo</code></li>
+      <li>Volunteer (two teams): <a href="https://demo.volorota.org/v/${DEMO_TOKEN_TOM}">Tom's magic link</a></li>
+      <li>Volunteer (worship leader): <a href="https://demo.volorota.org/v/${DEMO_TOKEN_SARAH}">Sarah's magic link</a></li>
+      <li>Volunteer (nursery): <a href="https://demo.volorota.org/v/${DEMO_TOKEN_GRACE}">Grace's magic link</a></li>
+    </ul>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <h2>Self-host it</h2>
+  <p style="color:var(--muted)">A 1&nbsp;GB VPS is plenty. The timed walkthrough from clean box to published schedule runs about ten minutes.</p>
+  <pre>docker run -d --name volorota \
+  -p 3000:3000 -v volorota_data:/data \
+  -e VOLOROTA_ADMIN_PASSWORD='pick-a-strong-password' \
+  ghcr-or-build-from-source   # see the README</pre>
+  <p style="margin-top:.75rem"><a href="https://github.com/VoloRota/volorota">Full quickstart, env reference, and deployment guides on GitHub →</a></p>
+</div></section>
+
+<footer><div class="wrap">VoloRota · <a href="https://github.com/VoloRota/volorota/blob/main/LICENSE">AGPL-3.0</a> · self-hosted · a roster of the willing</div></footer>
+</body>
+</html>

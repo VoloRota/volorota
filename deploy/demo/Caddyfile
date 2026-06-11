@@ -1,6 +1,12 @@
-# Apex redirects to the demo until a proper landing page exists
+# Apex serves the landing page (rendered by reset.sh with demo links)
 volorota.org {
-	redir https://{$DEMO_DOMAIN}{uri} permanent
+	root * /srv/landing
+	file_server
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
 }
 
 {$DEMO_DOMAIN} {

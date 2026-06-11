@@ -27,4 +27,11 @@ $COMPOSE exec -T \
   -e DEMO_TOKEN_GRACE="${DEMO_TOKEN_GRACE:-}" \
   volorota bun /tmp/seed.ts
 
+echo "[reset] rendering landing page"
+mkdir -p ./landing
+sed -e "s|\${DEMO_TOKEN_SARAH}|${DEMO_TOKEN_SARAH:-}|g" \
+    -e "s|\${DEMO_TOKEN_TOM}|${DEMO_TOKEN_TOM:-}|g" \
+    -e "s|\${DEMO_TOKEN_GRACE}|${DEMO_TOKEN_GRACE:-}|g" \
+    ./landing.template.html > ./landing/index.html
+
 echo "[reset] done"
