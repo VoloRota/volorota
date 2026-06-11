@@ -72,7 +72,7 @@ for (const p of [people[10], people[11], people[7]]) addTeamMember(db, p.id, sou
 // schedule her as a vocalist (visible on the Worship team's member checkboxes)
 setMemberQualifications(db, worship.id, people[2]!.id, ["Keys"]);
 
-db.prepare("UPDATE teams SET leader_person_id = ? WHERE id = ?").run(people[0].id, worship.id);
+db.prepare("UPDATE teams SET leader_person_id = ? WHERE id = ?").run(people[3]!.id, worship.id);
 db.prepare("UPDATE teams SET leader_person_id = ? WHERE id = ?").run(people[6].id, nursery.id);
 
 // ---- schedule ---------------------------------------------------------------
@@ -118,7 +118,7 @@ const expiry = (() => {
   return d.toISOString().replace("T", " ").slice(0, 19);
 })();
 const fixed: Array<[string, number]> = [
-  ["DEMO_TOKEN_SARAH", people[0]!.id],
+  ["DEMO_TOKEN_DAVID", people[3]!.id],
   ["DEMO_TOKEN_TOM", people[7]!.id],
   ["DEMO_TOKEN_GRACE", people[8]!.id],
 ];

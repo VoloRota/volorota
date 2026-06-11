@@ -22,14 +22,14 @@ echo "[reset] seeding"
 docker compose cp ./seed.ts volorota:/tmp/seed.ts
 $COMPOSE exec -T \
   -e VOLOROTA_DB=/data/volorota.db \
-  -e DEMO_TOKEN_SARAH="${DEMO_TOKEN_SARAH:-}" \
+  -e DEMO_TOKEN_DAVID="${DEMO_TOKEN_DAVID:-}" \
   -e DEMO_TOKEN_TOM="${DEMO_TOKEN_TOM:-}" \
   -e DEMO_TOKEN_GRACE="${DEMO_TOKEN_GRACE:-}" \
   volorota bun /tmp/seed.ts
 
 echo "[reset] rendering landing page"
 mkdir -p ./landing
-sed -e "s|\${DEMO_TOKEN_SARAH}|${DEMO_TOKEN_SARAH:-}|g" \
+sed -e "s|\${DEMO_TOKEN_DAVID}|${DEMO_TOKEN_DAVID:-}|g" \
     -e "s|\${DEMO_TOKEN_TOM}|${DEMO_TOKEN_TOM:-}|g" \
     -e "s|\${DEMO_TOKEN_GRACE}|${DEMO_TOKEN_GRACE:-}|g" \
     ./landing.template.html > ./landing/index.html

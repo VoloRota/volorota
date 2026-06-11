@@ -112,6 +112,7 @@ You now have a published schedule. Total time: ~15 minutes for a typical roster.
 | `VOLOROTA_PORT` | `3000` (falls back to `PORT`) | Listening port |
 | `VOLOROTA_DB` | `./data/volorota.db` (host), `/data/volorota.db` (container) | SQLite database path |
 | `VOLOROTA_ADMIN_PASSWORD` | — | **Required.** Admin console password; server refuses to start without it |
+| `VOLOROTA_BASE_URL` | `http://localhost:3000` | **Set this in production.** Public URL of your instance — used in emailed magic links and volunteers' calendar-feed URLs |
 | `VOLOROTA_SESSION_SECRET` | auto | Optional session-signing secret (≥32 chars); generated and persisted in the DB if unset |
 | `VOLOROTA_SMTP_HOST` | — | SMTP relay host; without it the app runs in capture mode (see [Email setup](#email-setup)) |
 | `VOLOROTA_SMTP_PORT` | `587` | SMTP port |
@@ -150,7 +151,8 @@ environment:
   VOLOROTA_SMTP_FROM: church.office@gmail.com
 ```
 
-4. Restart the container. The capture-mode banner disappears; sends now show `transport: smtp` in `/admin/outbox`.
+4. Set `VOLOROTA_BASE_URL` to your instance's public URL (e.g. `https://schedule.yourchurch.org`) — the links inside those emails are built from it.
+5. Restart the container. The capture-mode banner disappears; sends now show `transport: smtp` in `/admin/outbox`.
 
 To verify: open a service, click **Notify volunteers**, and check both the recipient's inbox and `/admin/outbox`.
 
