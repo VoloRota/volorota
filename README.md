@@ -10,20 +10,18 @@ Licensed under [AGPL-3.0](LICENSE).
 
 ---
 
-## Feature State (Early Development)
+## Features
 
-| Feature | Status |
-|---------|--------|
-| Data layer (people, teams, roles, templates, services) | Done |
-| Admin UI scaffolding | Done |
-| CSV people import | Done |
-| Authentication (admin password gate) | Done |
-| Volunteer flow (magic-link accept/decline/swap) | Planned |
-| Auto-rotation scheduler | Planned |
-| Email notifications (SMTP) | Planned |
-| Demo instance | Planned |
+- **People, teams, roles** — CSV import, per-member role qualifications (a keys player is never scheduled as a vocalist), team leaders, crews
+- **Recurring schedules** — service templates generate instances; published services are never altered by later template edits
+- **Auto-fill** — deterministic rotation honoring blockout dates: least-recently-served individuals, or whole-crew rotation ("Crew B has the 2nd Sunday"); no cross-team double-booking; unfillable slots are reported with the reason and a link to fix it
+- **Volunteer flow** — magic links by email, no volunteer accounts: accept, decline, pick your own replacement, set blockout dates, subscribe a calendar feed
+- **Matrix view** — services × role slots at a glance, color- and symbol-coded
+- **Email** — any SMTP relay ([setup guide](#email-setup)); leader notifications on declines and replacements; configurable reminders; capture mode with an in-app outbox when no relay is configured
+- **Export** — per-volunteer ICS feeds, CSV export, printable schedules; freeform per-service notes
+- **Onboarding** — a setup checklist on fresh installs that retires itself once the first schedule is filled
 
-The data layer is fully functional. You can define your complete roster today; the scheduling and volunteer-facing features land in subsequent releases.
+Deliberately not included: children's check-in, giving, or a member database — VoloRota does scheduling and pairs with whatever ChMS you already use.
 
 ---
 
@@ -151,10 +149,12 @@ environment:
   VOLOROTA_SMTP_FROM: church.office@gmail.com
 ```
 
-4. Set `VOLOROTA_BASE_URL` to your instance's public URL (e.g. `https://schedule.yourchurch.org`) — the links inside those emails are built from it.
+4. Set `VOLOROTA_BASE_URL` to your instance's public URL (e.g. `https://schedule.yourchurch.org`) — the links inside those emails are built from it. That URL has to actually reach your server: add a DNS record (an A record for `schedule` pointing at your server's IP, at whoever hosts your domain's DNS) and put TLS in front (a reverse proxy like Caddy — see `deploy/demo/` for a working example). DNS and TLS are outside VoloRota itself, but skipping them is the most common reason emailed links don't work.
 5. Restart the container. The capture-mode banner disappears; sends now show `transport: smtp` in `/admin/outbox`.
 
 To verify: open a service, click **Notify volunteers**, and check both the recipient's inbox and `/admin/outbox`.
+
+**Do the email domain and `VOLOROTA_BASE_URL` need to match?** No — they are independent. The From address is whatever your relay authenticates as; `VOLOROTA_BASE_URL` only controls where the links inside the emails point. Sending from `smallchurchoffice@gmail.com` with links to `https://schedule.smallchurch.org` works fine. If your church has Google Workspace on its own domain, the same App Password steps work there and the two will match — nice, but not required.
 
 Consumer Gmail allows roughly 500 outgoing messages a day — far more than a small church's scheduling traffic. Note that routing mail through Gmail means Google processes your notification emails; if that matters to your congregation, the same five variables point at any other provider (Fastmail, Mailbox.org, Amazon SES, or your own relay) unchanged.
 
