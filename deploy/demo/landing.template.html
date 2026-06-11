@@ -6,82 +6,238 @@
 <title>VoloRota — self-hosted volunteer scheduling for churches</title>
 <meta name="description" content="Open-source, self-hosted volunteer scheduling for churches. Volunteers accept, decline, and arrange replacements from emailed links — no accounts, no passwords. AGPL-3.0.">
 <style>
-  :root{--accent:#0f766e;--accent-dark:#115e59;--nav:#0f172a;--bg:#f8fafc;--text:#1e293b;--muted:#64748b;--line:#e2e8f0}
+  /* ————————————————————————————————————————————————————————————
+     VoloRota landing — "Sunday bulletin meets engineering document"
+     Editorial serif display (system stacks only — zero third-party
+     requests, same promise the product itself tests for), paper-warm
+     surface, hairline rules, teal accent, and a pure-CSS matrix as
+     hero art. ———————————————————————————————————————————————————— */
+  :root{
+    --paper:#faf9f7; --paper-deep:#f1efe9;
+    --ink:#1c2430; --ink-soft:#4a5568; --muted:#7b8794;
+    --teal:#0f766e; --teal-deep:#115e59; --teal-wash:#e6f2f0;
+    --mint:#5eead4;
+    --line:#e3e0d8; --rule:#1c2430;
+    --ok-bg:#dcfce7; --ok:#15803d;
+    --maybe-bg:#fef9c3; --maybe:#a16207;
+    --no-bg:#fee2e2; --no:#b91c1c;
+    --empty-bg:#f4f3ef; --empty:#a8b0ba;
+    --serif:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,'Times New Roman',serif;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  }
   *{box-sizing:border-box;margin:0}
-  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
-  .wrap{max-width:880px;margin:0 auto;padding:0 1.25rem}
-  header{background:var(--nav);color:#fff;padding:.9rem 0}
-  header .wrap{display:flex;align-items:center;gap:.5rem}
-  .dot{width:.6rem;height:.6rem;border-radius:50%;background:#5eead4;display:inline-block}
-  .wordmark{font-weight:700;font-size:1.15rem}
-  header a{color:#cbd5e1;text-decoration:none;margin-left:auto}
-  .hero{padding:3.5rem 0 2.5rem;text-align:center}
-  .hero h1{font-size:2rem;line-height:1.25;margin-bottom: .75rem}
-  .hero p{color:var(--muted);max-width:560px;margin:0 auto 1.5rem;font-size:1.05rem}
-  .btns{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap}
-  .btn{display:inline-block;padding:.7rem 1.4rem;border-radius:8px;text-decoration:none;font-weight:600}
-  .btn-primary{background:var(--accent);color:#fff}
-  .btn-primary:hover{background:var(--accent-dark)}
-  .btn-secondary{background:#fff;color:var(--accent);border:1px solid var(--line)}
-  section{padding:2rem 0;border-top:1px solid var(--line)}
-  h2{font-size:1.25rem;margin-bottom:.75rem}
-  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem;margin-top:1rem}
-  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.1rem}
-  .card h3{font-size:1rem;margin-bottom:.4rem}
-  .card p{color:var(--muted);font-size:.92rem}
-  pre{background:var(--nav);color:#e2e8f0;border-radius:10px;padding:1rem;overflow-x:auto;font-size:.85rem;margin-top:.75rem}
-  .demo-creds{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.1rem;margin-top:1rem}
-  .demo-creds li{margin:.35rem 0 .35rem 1.2rem;overflow-wrap:anywhere}
-  .demo-creds code{background:var(--bg);padding:.1rem .4rem;border-radius:4px;font-size:.88em}
-  footer{padding:2rem 0 3rem;color:var(--muted);font-size:.85rem;text-align:center;border-top:1px solid var(--line)}
-  footer a{color:var(--accent)}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:var(--sans);color:var(--ink);line-height:1.65;background:var(--paper);
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(28,36,48,.035) 1px, transparent 0);
+    background-size:22px 22px;
+  }
+  .wrap{max-width:1040px;margin:0 auto;padding:0 1.5rem}
+  a{color:var(--teal)}
+
+  /* ——— masthead, like a bulletin header ——— */
+  .masthead{border-bottom:3px double var(--rule);background:var(--paper)}
+  .masthead .wrap{display:flex;align-items:baseline;gap:.6rem;padding:1.1rem 1.5rem}
+  .dot{width:.55rem;height:.55rem;border-radius:50%;background:var(--teal);display:inline-block;transform:translateY(-1px)}
+  .wordmark{font-family:var(--serif);font-weight:700;font-size:1.35rem;letter-spacing:.01em}
+  .mast-note{font-family:var(--mono);font-size:.7rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  .masthead a.gh{margin-left:auto;font-size:.9rem;text-decoration:none;border-bottom:1px solid var(--teal)}
+
+  /* ——— hero: asymmetric editorial + matrix art ——— */
+  .hero{padding:4.5rem 0 3.5rem;overflow:hidden}
+  .hero .wrap{display:grid;grid-template-columns:7fr 5fr;gap:3rem;align-items:center}
+  .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--teal);margin-bottom:1.1rem}
+  .eyebrow::before{content:"";display:inline-block;width:2.2rem;height:1px;background:var(--teal);margin-right:.7rem;vertical-align:middle}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(2.4rem,5.2vw,3.6rem);line-height:1.08;letter-spacing:-.015em;margin-bottom:1.2rem}
+  h1 em{font-style:italic;color:var(--teal-deep)}
+  .lede{font-size:1.08rem;color:var(--ink-soft);max-width:34rem;margin-bottom:1.8rem}
+  .btns{display:flex;gap:.8rem;flex-wrap:wrap}
+  .btn{display:inline-block;padding:.78rem 1.5rem;text-decoration:none;font-weight:600;font-size:.95rem;border-radius:2px;transition:transform .15s ease, box-shadow .15s ease}
+  .btn-primary{background:var(--teal);color:#fff;box-shadow:3px 3px 0 var(--ink)}
+  .btn-primary:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+  .btn-secondary{background:transparent;color:var(--ink);border:1px solid var(--ink)}
+  .btn-secondary:hover{background:var(--ink);color:var(--paper)}
+  .hero-foot{margin-top:1.6rem;font-family:var(--mono);font-size:.72rem;color:var(--muted);letter-spacing:.06em}
+
+  /* the matrix, as art */
+  .matrix-art{position:relative;transform:rotate(2deg)}
+  .matrix-card{background:#fff;border:1px solid var(--line);box-shadow:8px 10px 0 rgba(28,36,48,.08);padding:1rem 1.1rem;border-radius:4px}
+  .matrix-card h4{font-family:var(--mono);font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:.6rem}
+  .mgrid{display:grid;grid-template-columns:5.6rem repeat(3,1fr);gap:4px;font-size:.62rem;font-family:var(--mono)}
+  .mhead{color:var(--muted);text-align:center;padding:.2rem 0;letter-spacing:.05em}
+  .mrole{color:var(--ink-soft);padding:.34rem .3rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mcell{text-align:center;padding:.34rem .2rem;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;animation:fill .5s ease forwards}
+  .ok{background:var(--ok-bg);color:var(--ok)}
+  .maybe{background:var(--maybe-bg);color:var(--maybe)}
+  .no{background:var(--no-bg);color:var(--no)}
+  .empty{background:var(--empty-bg);color:var(--empty)}
+  .matrix-caption{position:absolute;right:-.4rem;bottom:-2.1rem;font-family:var(--serif);font-style:italic;font-size:.95rem;color:var(--ink-soft);transform:rotate(-1.5deg)}
+  @keyframes fill{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
+  .mcell:nth-child(4n+2){animation-delay:.15s}.mcell:nth-child(4n+3){animation-delay:.3s}.mcell:nth-child(4n){animation-delay:.45s}
+  .r2 .mcell{animation-delay:.5s}.r2 .mcell:nth-child(2){animation-delay:.65s}
+  .r3 .mcell{animation-delay:.8s}.r3 .mcell:nth-child(3){animation-delay:.95s}
+  .r4 .mcell{animation-delay:1.1s}.r4 .mcell:nth-child(4){animation-delay:1.25s}
+
+  /* page-load rise for hero copy */
+  .rise{opacity:0;animation:rise .6s ease forwards}
+  .rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.18s}.rise.d3{animation-delay:.3s}.rise.d4{animation-delay:.44s}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  @media (prefers-reduced-motion: reduce){.rise,.mcell{animation:none;opacity:1}}
+
+  /* ——— numbered editorial reasons ——— */
+  .reasons{border-top:1px solid var(--rule);padding:3.5rem 0 2.5rem;background:var(--paper-deep)}
+  .sec-title{font-family:var(--serif);font-size:1.7rem;margin-bottom:2rem;letter-spacing:-.01em}
+  .reason-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule)}
+  .reason{padding:1.6rem 1.6rem 1.6rem 0;border-bottom:1px solid var(--line);display:flex;gap:1.2rem}
+  .reason:nth-child(odd){border-right:1px solid var(--line);padding-right:2rem}
+  .reason:nth-child(even){padding-left:2rem}
+  .rnum{font-family:var(--serif);font-style:italic;font-size:2.1rem;color:var(--teal);line-height:1;min-width:2.6rem}
+  .reason h3{font-size:1.02rem;margin-bottom:.35rem;font-weight:650}
+  .reason p{color:var(--ink-soft);font-size:.93rem}
+
+  /* ——— demo: the dark chapel ——— */
+  .demo{background:var(--ink);color:#e6e9ee;padding:3.6rem 0}
+  .demo .sec-title{color:#fff}
+  .demo .sec-title em{font-style:italic;color:var(--mint)}
+  .demo-sub{color:#9aa6b5;max-width:36rem;margin-bottom:1.8rem}
+  .demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:2.5rem}
+  .cred-block h4,.link-block h4{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--mint);margin-bottom:.9rem}
+  .cred{font-family:var(--mono);font-size:.88rem;line-height:2.1}
+  .cred a{color:#fff}
+  .cred code{background:rgba(255,255,255,.1);padding:.15rem .5rem;border-radius:3px}
+  .vlink{display:block;text-decoration:none;border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:.8rem 1rem;margin-bottom:.7rem;transition:border-color .15s ease,background .15s ease}
+  .vlink:hover{border-color:var(--mint);background:rgba(94,234,212,.06)}
+  .vlink .who{color:#fff;font-weight:600;font-size:.95rem}
+  .vlink .what{color:#9aa6b5;font-size:.8rem;display:block}
+  .vlink .arrow{float:right;color:var(--mint);font-family:var(--mono)}
+  .demo-note{margin-top:1.4rem;font-size:.8rem;color:#9aa6b5;font-style:italic;font-family:var(--serif)}
+
+  /* ——— quickstart terminal ——— */
+  .quick{padding:3.6rem 0}
+  .quick .lede2{color:var(--ink-soft);max-width:34rem;margin-bottom:1.5rem}
+  .term{background:var(--ink);border-radius:8px;overflow:hidden;box-shadow:10px 12px 0 rgba(28,36,48,.08)}
+  .term-bar{display:flex;gap:.45rem;padding:.7rem .9rem;background:#141b25;border-bottom:1px solid rgba(255,255,255,.06)}
+  .term-bar span{width:.7rem;height:.7rem;border-radius:50%;background:#2c3848}
+  .term-bar span:first-child{background:#e06c60}.term-bar span:nth-child(2){background:#e0b25f}.term-bar span:nth-child(3){background:#5fb97a}
+  .term pre{padding:1.2rem 1.3rem;color:#dbe3ec;font-family:var(--mono);font-size:.84rem;line-height:1.7;overflow-x:auto}
+  .term .p{color:var(--mint)}
+  .term .c{color:#7b8794}
+  .quick-foot{margin-top:1.1rem;font-size:.92rem}
+
+  footer{border-top:3px double var(--rule);padding:2.2rem 0 3rem;text-align:center}
+  footer p{font-family:var(--serif);font-style:italic;color:var(--ink-soft);font-size:.98rem}
+  footer .small{font-family:var(--mono);font-style:normal;font-size:.7rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase;margin-top:.5rem}
+  footer a{color:var(--teal)}
+
+  @media (max-width: 760px){
+    .hero .wrap{grid-template-columns:1fr;gap:2.6rem}
+    .matrix-art{transform:rotate(0);max-width:26rem}
+    .reason-grid{grid-template-columns:1fr}
+    .reason:nth-child(odd){border-right:none;padding-right:0}
+    .reason:nth-child(even){padding-left:0}
+    .demo-grid{grid-template-columns:1fr}
+  }
 </style>
 </head>
 <body>
-<header><div class="wrap"><span class="dot"></span><span class="wordmark">VoloRota</span><a href="https://github.com/VoloRota/volorota">GitHub</a></div></header>
 
-<div class="hero wrap">
-  <h1>Volunteer scheduling your church can own.</h1>
-  <p>Open-source and self-hosted. Auto-fill a fair rotation around blockout dates — then volunteers accept, decline, or arrange their own replacement from an emailed link. No accounts. No passwords. No monthly fee.</p>
-  <div class="btns">
-    <a class="btn btn-primary" href="https://demo.volorota.org">Try the live demo</a>
-    <a class="btn btn-secondary" href="https://github.com/VoloRota/volorota#quickstart">Self-host in 10 minutes</a>
+<header class="masthead"><div class="wrap">
+  <span class="dot"></span><span class="wordmark">VoloRota</span>
+  <span class="mast-note">a roster of the willing</span>
+  <a class="gh" href="https://github.com/VoloRota/volorota">GitHub</a>
+</div></header>
+
+<section class="hero"><div class="wrap">
+  <div>
+    <p class="eyebrow rise d1">Open source · Self-hosted · AGPL-3.0</p>
+    <h1 class="rise d2">Volunteer scheduling your church can <em>own</em>.</h1>
+    <p class="lede rise d3">Auto-fill a fair rotation around blockout dates — then volunteers accept, decline, or arrange their own replacement from an emailed link. No accounts. No passwords. No monthly fee.</p>
+    <div class="btns rise d4">
+      <a class="btn btn-primary" href="https://demo.volorota.org">Try the live demo</a>
+      <a class="btn btn-secondary" href="https://github.com/VoloRota/volorota#quickstart">Self-host it</a>
+    </div>
+    <p class="hero-foot rise d4">one container · one SQLite file · ~18 MB · zero third-party requests</p>
   </div>
-</div>
-
-<section><div class="wrap">
-  <h2>Why churches pick it</h2>
-  <div class="cols">
-    <div class="card"><h3>Volunteers never make accounts</h3><p>Every action — accept, decline, pick a replacement, set blockout dates, subscribe a calendar feed — happens through a private emailed link. Zero onboarding for the nursery team.</p></div>
-    <div class="card"><h3>Fair, explainable auto-fill</h3><p>Least-recently-served goes first, role qualifications are respected (your keys player is never scheduled on vocals), and nobody is double-booked across teams. Same data, same schedule, every time.</p></div>
-    <div class="card"><h3>Your data, your box</h3><p>One Docker container, one SQLite file, ~18&nbsp;MB of memory. No telemetry, no third-party requests, no vendor. AGPL-3.0 keeps it that way.</p></div>
-    <div class="card"><h3>Both ways churches schedule</h3><p>Individual rotation for nursery and sound; whole-crew rotation for worship teams ("Crew B has the 2nd Sunday") — with blockouts honored in both.</p></div>
+  <div class="matrix-art" aria-hidden="true">
+    <div class="matrix-card">
+      <h4>June — Sunday Service 10:30</h4>
+      <div class="mgrid">
+        <span></span><span class="mhead">JUN 14</span><span class="mhead">JUN 21</span><span class="mhead">JUN 28</span>
+        <span class="mrole">Vocals</span><span class="mcell ok">✓ Sarah</span><span class="mcell ok">✓ David</span><span class="mcell maybe">? Sarah</span>
+        <span class="mrole r2">Keys</span><span class="mcell ok r2">✓ Emily</span><span class="mcell maybe r2">? Marcus</span><span class="mcell maybe r2">? Emily</span>
+        <span class="mrole r3">Nursery</span><span class="mcell ok r3">✓ Anna</span><span class="mcell maybe r3">? Grace</span><span class="mcell no r3">✗ Tom</span>
+        <span class="mrole r4">Sound</span><span class="mcell ok r4">✓ Hannah</span><span class="mcell maybe r4">? Caleb</span><span class="mcell empty r4">— open</span>
+      </div>
+    </div>
+    <p class="matrix-caption">the whole month, at a glance</p>
   </div>
 </div></section>
 
-<section><div class="wrap">
-  <h2>Poke the demo — you can't break it</h2>
-  <p style="color:var(--muted)">Fictional congregation, resets every hour. Open a volunteer link on your phone — that's the whole pitch.</p>
-  <div class="demo-creds">
-    <ul>
-      <li>Admin: <a href="https://demo.volorota.org">demo.volorota.org</a> — password <code>volorota-demo</code></li>
-      <li>Volunteer (two teams): <a href="https://demo.volorota.org/v/${DEMO_TOKEN_TOM}">Tom's magic link</a></li>
-      <li>Volunteer (worship leader): <a href="https://demo.volorota.org/v/${DEMO_TOKEN_SARAH}">Sarah's magic link</a></li>
-      <li>Volunteer (nursery): <a href="https://demo.volorota.org/v/${DEMO_TOKEN_GRACE}">Grace's magic link</a></li>
-    </ul>
+<section class="reasons"><div class="wrap">
+  <h2 class="sec-title">Why churches pick it</h2>
+  <div class="reason-grid">
+    <div class="reason"><span class="rnum">01</span><div>
+      <h3>Volunteers never make accounts</h3>
+      <p>Every action — accept, decline, pick a replacement, set blockout dates, subscribe a calendar feed — happens through a private emailed link. Zero onboarding for the nursery team.</p>
+    </div></div>
+    <div class="reason"><span class="rnum">02</span><div>
+      <h3>Fair, explainable auto-fill</h3>
+      <p>Least-recently-served goes first, role qualifications are respected — your keys player is never scheduled on vocals — and nobody is double-booked across teams. Same data, same schedule, every time.</p>
+    </div></div>
+    <div class="reason"><span class="rnum">03</span><div>
+      <h3>Your data, your box</h3>
+      <p>One Docker container, one SQLite file, about 18&nbsp;MB of memory. No telemetry, no third-party requests, no vendor. AGPL-3.0 keeps it that way.</p>
+    </div></div>
+    <div class="reason"><span class="rnum">04</span><div>
+      <h3>Both ways churches schedule</h3>
+      <p>Individual rotation for nursery and sound; whole-crew rotation for worship teams — “Crew B has the 2nd Sunday” — with blockouts honored in both.</p>
+    </div></div>
   </div>
 </div></section>
 
-<section><div class="wrap">
-  <h2>Self-host it</h2>
-  <p style="color:var(--muted)">A 1&nbsp;GB VPS is plenty. The timed walkthrough from clean box to published schedule runs about ten minutes.</p>
-  <pre>docker run -d --name volorota \
-  -p 3000:3000 -v volorota_data:/data \
-  -e VOLOROTA_ADMIN_PASSWORD='pick-a-strong-password' \
-  ghcr-or-build-from-source   # see the README</pre>
-  <p style="margin-top:.75rem"><a href="https://github.com/VoloRota/volorota">Full quickstart, env reference, and deployment guides on GitHub →</a></p>
+<section class="demo" id="demo"><div class="wrap">
+  <h2 class="sec-title">Poke the demo — <em>you can’t break it</em></h2>
+  <p class="demo-sub">A fictional congregation that resets every hour. Open a volunteer link on your phone — that’s the whole pitch.</p>
+  <div class="demo-grid">
+    <div class="cred-block">
+      <h4>Admin console</h4>
+      <p class="cred">
+        url&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="https://demo.volorota.org">demo.volorota.org</a><br>
+        password&nbsp;<code>volorota-demo</code>
+      </p>
+      <p class="demo-note">Try the matrix view, run auto-fill on an open Sunday, and check the Worship team’s role qualifications — Emily only plays keys, and the schedule knows it.</p>
+    </div>
+    <div class="link-block">
+      <h4>Volunteer magic links</h4>
+      <a class="vlink" href="https://demo.volorota.org/v/${DEMO_TOKEN_TOM}"><span class="arrow">→</span><span class="who">Tom</span><span class="what">serves on two teams — decline something and pick his replacement</span></a>
+      <a class="vlink" href="https://demo.volorota.org/v/${DEMO_TOKEN_SARAH}"><span class="arrow">→</span><span class="who">Sarah</span><span class="what">worship leader — she gets the emails when someone declines</span></a>
+      <a class="vlink" href="https://demo.volorota.org/v/${DEMO_TOKEN_GRACE}"><span class="arrow">→</span><span class="who">Grace</span><span class="what">nursery — set a blockout date, watch auto-fill respect it</span></a>
+    </div>
+  </div>
 </div></section>
 
-<footer><div class="wrap">VoloRota · <a href="https://github.com/VoloRota/volorota/blob/main/LICENSE">AGPL-3.0</a> · self-hosted · a roster of the willing</div></footer>
+<section class="quick"><div class="wrap">
+  <h2 class="sec-title">Self-host it before the offering plate comes back</h2>
+  <p class="lede2">A 1&nbsp;GB VPS is plenty. The timed walkthrough from clean box to published schedule runs about ten minutes.</p>
+  <div class="term">
+    <div class="term-bar"><span></span><span></span><span></span></div>
+    <pre><span class="p">$</span> git clone https://github.com/VoloRota/volorota.git &amp;&amp; cd volorota
+<span class="p">$</span> docker build -t volorota .
+<span class="p">$</span> docker run -d --name volorota \
+    -p 3000:3000 -v volorota_data:/data \
+    -e VOLOROTA_ADMIN_PASSWORD='pick-a-strong-password' \
+    volorota
+<span class="c"># open http://your-server:3000 — the setup checklist takes it from here</span></pre>
+  </div>
+  <p class="quick-foot"><a href="https://github.com/VoloRota/volorota">Full quickstart, env reference, and deployment guides on GitHub →</a></p>
+</div></section>
+
+<footer><div class="wrap">
+  <p>“Many hands make light work — somebody still has to schedule the hands.”</p>
+  <p class="small">VoloRota · <a href="https://github.com/VoloRota/volorota/blob/main/LICENSE">AGPL-3.0</a> · self-hosted · a roster of the willing</p>
+</div></footer>
+
 </body>
 </html>
