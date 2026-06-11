@@ -38,3 +38,4 @@ data/
 *.db
 *.db-wal
 *.db-shm
+deploy/demo/landing/

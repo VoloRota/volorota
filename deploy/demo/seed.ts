@@ -14,7 +14,7 @@ import {
   createPerson, createTeam, createTeamRole, addTeamMember,
   createCrew, addCrewMember, createTemplate, addTemplateRole,
   generateServicesFromTemplate, createBlockout, updateAssignmentStatus,
-  createServiceNote,
+  createServiceNote, setMemberQualifications,
 } from "/app/src/db/queries.ts";
 import { runAutofill } from "/app/src/engine/autofill.ts";
 import { hashToken } from "/app/src/volunteer/tokens.ts";
@@ -68,6 +68,10 @@ const sound = createTeam(db, "Sound", "individual");
 createTeamRole(db, sound.id, "Sound Tech", 1);
 for (const p of [people[10], people[11], people[7]]) addTeamMember(db, p.id, sound.id);
 
+// Qualification showcase: Emily only plays keys — auto-fill will never
+// schedule her as a vocalist (visible on the Worship team's member checkboxes)
+setMemberQualifications(db, worship.id, people[2]!.id, ["Keys"]);
+
 db.prepare("UPDATE teams SET leader_person_id = ? WHERE id = ?").run(people[0].id, worship.id);
 db.prepare("UPDATE teams SET leader_person_id = ? WHERE id = ?").run(people[6].id, nursery.id);
 
@@ -87,7 +91,7 @@ createBlockout(db, people[10].id, fmt(addDays(nextSunday, 28)), fmt(addDays(next
 
 // Notes — including the demo disclosure (kept in data, not in product code)
 createServiceNote(db, services[0]!.id, null,
-  "Welcome to the VoloRota demo! This data resets every hour. Poke anything — you can't break it.");
+  "Welcome to the VoloRota demo! This data resets every hour. Poke anything — you can't break it. (Tip: Emily only plays keys — check the Worship team's role qualifications, and notice the schedule never puts her on vocals.)");
 createServiceNote(db, services[0]!.id, sound.id,
   "New wireless mics this week — setup guide: https://example.com/mic-setup");
 createServiceNote(db, services[2]!.id, null,
