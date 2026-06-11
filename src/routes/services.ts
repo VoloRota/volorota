@@ -21,6 +21,7 @@ import {
 } from "../db/queries.js";
 import { runAutofill } from "../engine/autofill.js";
 import { layout, escHtml, flash } from "../views/layout.js";
+import { getTeamName } from "../db/onboarding.js";
 
 export const servicesRouter = new Hono();
 
@@ -184,7 +185,7 @@ servicesRouter.post("/autofill-range", async (c) => {
   }
 
   const report = runAutofill(db, { startDate, endDate });
-  return c.html(layout("Auto-fill Results", renderAutofillReport(report, null)));
+  return c.html(layout("Auto-fill Results", renderAutofillReport(report, null, db)));
 });
 
 // Service detail — slots + assignments
@@ -292,6 +293,12 @@ servicesRouter.get("/:id", (c) => {
         <button type="submit" class="btn">Auto-fill This Service</button>
       </form>
     </div>
+
+    ${slots.length === 0 && svc.template_id
+      ? `<p class="onboarding-hint">This service has no role slots — <a href="/admin/templates/${svc.template_id}">add roles to its template</a> and regenerate.</p>`
+      : slots.length === 0
+      ? `<p class="onboarding-hint">This service has no role slots — add slots below, or <a href="/admin/templates">create a template</a> with roles.</p>`
+      : ""}
 
     <h2>Slots &amp; Assignments</h2>
     ${anyoneBlocked ? `<p style="font-size:0.85rem;color:#666"><em>[BLOCKED OUT]</em> next to a name indicates that person has a blockout on ${escHtml(svc.date)}.</p>` : ""}
@@ -471,16 +478,93 @@ servicesRouter.post("/:id/autofill", async (c) => {
   if (!svc) return c.notFound();
 
   const report = runAutofill(db, { serviceId: id });
-  return c.html(layout("Auto-fill Results", renderAutofillReport(report, id)));
+  return c.html(layout("Auto-fill Results", renderAutofillReport(report, id, db)));
 });
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Convert a skip-reason key to a plain-language sentence + fix link.
+ *
+ * Contract:
+ * - Known reasons return a specific sentence and direct fix link.
+ * - ANY unknown reason key (including future keys added by sibling features)
+ *   renders as humanized text (underscores → spaces) with a generic link to
+ *   the teams page, so the template never needs to change for new keys.
+ */
+function skipReasonHtml(
+  s: {
+    reason: string;
+    teamId: number;
+    roleName: string;
+    personName?: string;
+    crewName?: string;
+  },
+  db: import("bun:sqlite").Database
+): string {
+  const teamName = escHtml(getTeamName(db, s.teamId));
+  const teamLink = `<a href="/admin/teams/${s.teamId}">the ${teamName} team page</a>`;
+
+  switch (s.reason) {
+    case "all_candidates_blocked":
+      return `Everyone on the ${teamName} team is blocked out on this date — go to ${teamLink} to check availability.`;
+
+    case "no_team_members":
+      return `The ${teamName} team has no members yet — add people on ${teamLink}.`;
+
+    case "no_crew_members":
+      return `The ${teamName} team has no crew members yet — add crew members on ${teamLink}.`;
+
+    case "crew_member_blocked": {
+      const who = s.personName ? escHtml(s.personName) : "A crew member";
+      const crew = s.crewName ? ` (${escHtml(s.crewName)})` : "";
+      return `${who}${crew} on the ${teamName} team is blocked out on this date. In crew mode, no substitution is made — see ${teamLink}.`;
+    }
+
+    case "already_assigned":
+      return `This slot was already assigned before auto-fill ran.`;
+
+    case "no_qualified_members":
+      return `No one on the ${teamName} team is qualified for the ${escHtml(s.roleName)} role — assign qualifications on ${teamLink}.`;
+
+    case "no_qualified_in_crew":
+      return `No one in the assigned crew on the ${teamName} team is qualified for the ${escHtml(s.roleName)} role — see ${teamLink}.`;
+
+    default: {
+      // Generic fallback: humanize underscores so any future reason key renders
+      // readably without requiring a template change here.
+      const humanized = s.reason.replace(/_/g, " ");
+      return `Could not fill: ${escHtml(humanized)} — check ${teamLink} for details.`;
+    }
+  }
+}
+
+interface ReportSkipped {
+  serviceName: string;
+  serviceDate: string;
+  roleName: string;
+  position: number;
+  reason: string;
+  teamId: number;
+  crewName?: string;
+  personName?: string;
+}
+
+interface ReportFilled {
+  serviceName: string;
+  serviceDate: string;
+  roleName: string;
+  position: number;
+  personName: string;
+  crewName?: string;
+}
+
 function renderAutofillReport(
-  report: { filled: Array<{ serviceName: string; serviceDate: string; roleName: string; position: number; personName: string; crewName?: string }>; skipped: Array<{ serviceName: string; serviceDate: string; roleName: string; position: number; reason: string; crewName?: string; personName?: string }> },
-  serviceId: number | null
+  report: { filled: ReportFilled[]; skipped: ReportSkipped[] },
+  serviceId: number | null,
+  dbInstance: import("bun:sqlite").Database
 ): string {
   const backLink = serviceId
     ? `<a href="/admin/services/${serviceId}">&larr; Back to Service</a>`
@@ -497,22 +581,29 @@ function renderAutofillReport(
   ).join("");
 
   const skippedRows = report.skipped.map((s) => {
-    const reasonMap: Record<string, string> = {
-      all_candidates_blocked: "All candidates blocked out",
-      no_team_members: "No team members",
-      no_crew_members: "No crew members",
-      crew_member_blocked: `Crew member blocked out${s.personName ? `: ${s.personName}` : ""}`,
-      already_assigned: "Already assigned",
-    };
-    const reasonText = reasonMap[s.reason] ?? s.reason;
+    const reasonHtml = skipReasonHtml(s, dbInstance);
     return `<tr>
       <td>${escHtml(s.serviceName)}</td>
       <td>${escHtml(s.serviceDate)}</td>
       <td>${escHtml(s.roleName)}</td>
       <td>${s.position + 1}</td>
-      <td>${escHtml(reasonText)}${s.crewName ? ` <em>(crew: ${escHtml(s.crewName)})</em>` : ""}</td>
+      <td>${reasonHtml}</td>
     </tr>`;
   }).join("");
+
+  // Zero-slot dead-end: auto-fill ran on a service (or range) that has no slots
+  // at all — neither filled nor skipped will have entries.
+  const zeroSlotNotice =
+    report.filled.length === 0 && report.skipped.length === 0
+      ? `<div class="onboarding-hint">
+           Auto-fill found no unfilled slots. If you expected to fill slots, the services in
+           this range may have no roles defined. ${
+             serviceId
+               ? `<a href="/admin/services/${serviceId}">Go back to the service</a> and add slots, or`
+               : "Check your templates —"
+           } <a href="/admin/templates">add roles to a template</a> then regenerate services.
+         </div>`
+      : "";
 
   return `
     <h1>Auto-fill Results</h1>
@@ -536,6 +627,6 @@ function renderAutofillReport(
       <tbody>${skippedRows}</tbody>
     </table>` : ""}
 
-    ${report.filled.length === 0 && report.skipped.length === 0 ? `<p style="color:#999">No unfilled slots found in the selected range.</p>` : ""}
+    ${zeroSlotNotice}
   `;
 }

@@ -24,6 +24,7 @@ import {
 import { setTransport } from "./mail/mailer.js";
 import { buildSmtpTransportFromEnv } from "./mail/smtp.js";
 import { runReminderCheck } from "./notifications/reminders.js";
+import { getSetupChecklist } from "./db/onboarding.js";
 
 // Validate required env vars — refuse to start if missing
 const authConfigError = validateAuthConfig();
@@ -79,6 +80,9 @@ app.use("/admin/*", authMiddleware);
 // Admin redirect
 app.get("/", (c) => c.redirect("/admin"));
 app.get("/admin", (c) => {
+  const db = getDb();
+  const checklist = getSetupChecklist(db);
+
   const isCaptureMode = !process.env.VOLOROTA_SMTP_HOST;
   const captureBanner = isCaptureMode
     ? `<div class="flash flash-info">
@@ -86,9 +90,38 @@ app.get("/admin", (c) => {
          <a href="/admin/outbox">View outbox</a>
        </div>`
     : "";
+
+  // Setup checklist — only shown while no assignment exists (ISC-56).
+  // Once at least one assignment is present the checklist is permanently absent.
+  function checklistStep(done: boolean, text: string, href: string): string {
+    if (done) {
+      return `<li class="setup-step setup-step-done">
+        <span class="setup-step-icon" aria-hidden="true">&#10003;</span>
+        <span>${text}</span>
+      </li>`;
+    }
+    return `<li class="setup-step">
+      <span class="setup-step-icon" aria-hidden="true">&#9675;</span>
+      <a href="${href}">${text}</a>
+    </li>`;
+  }
+
+  const setupChecklist = checklist.hasAssignment ? "" : `
+    <div class="setup-checklist">
+      <h2 class="setup-checklist-title">Getting started</h2>
+      <ol class="setup-steps">
+        ${checklistStep(checklist.hasPeople, "Add at least one person to your roster", "/admin/people")}
+        ${checklistStep(checklist.hasTeamWithRole, "Create a team and add roles to it", "/admin/teams")}
+        ${checklistStep(checklist.hasTeamMember, "Add members to your teams", "/admin/teams")}
+        ${checklistStep(checklist.hasTemplateWithRole, "Create a service template with roles", "/admin/templates")}
+        ${checklistStep(checklist.hasAssignment, "Generate services and run auto-fill", "/admin/services")}
+      </ol>
+    </div>`;
+
   const body = `
     <h1>Dashboard</h1>
     ${captureBanner}
+    ${setupChecklist}
     <div class="dash-grid">
       <a class="dash-card" href="/admin/matrix">
         <div class="dash-card-title">Matrix View</div>
