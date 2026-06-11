@@ -1,3 +1,8 @@
+# Apex redirects to the demo until a proper landing page exists
+volorota.org {
+	redir https://{$DEMO_DOMAIN}{uri} permanent
+}
+
 {$DEMO_DOMAIN} {
 	reverse_proxy volorota:3000
 	header {
