@@ -217,10 +217,11 @@ describe("ISC-53: role qualifications filter individual mode", () => {
 
     const report = runAutofill(db);
 
-    // Door slot skipped (no qualified candidates)
+    // Door slot skipped with the qualification-specific reason — not the
+    // misleading "blocked" wording (rebase integration with OnboardingGuidance)
     const doorSkips = report.skipped.filter((s) => s.roleName === "Door");
     expect(doorSkips.length).toBe(1);
-    expect(doorSkips[0]!.reason).toBe("all_candidates_blocked");
+    expect(doorSkips[0]!.reason).toBe("no_qualified_members");
 
     // Usher slot filled by one of them
     const usherFills = report.filled.filter((f) => f.roleName === "Usher");

@@ -99,7 +99,8 @@ export interface SkipResult {
     | "no_crew_members"
     | "crew_member_blocked"
     | "already_assigned"
-    | "no_qualified_in_crew"; // ISC-53: crew member not qualified for this role
+    | "no_qualified_in_crew" // ISC-53: crew member not qualified for this role
+    | "no_qualified_members"; // ISC-53: no team member is qualified for this role
   /** For crew mode: which crew was assigned to this service. */
   crewName?: string;
   personId?: number;
@@ -225,12 +226,29 @@ function fillIndividualSlots(
 
     // Filter: not blocked out, not already in this service (within-team),
     //         and qualified for this slot's role (ISC-53)
-    const candidates = members.filter((p) => {
+    // ISC-53 qualification gate first, separately, so the skip reason can
+    // distinguish "nobody is qualified" from "everyone is blocked out"
+    const qualified = members.filter((p) => {
+      const qualSet = qualifications.get(p.id);
+      return qualSet === undefined || qualSet.has(slot.role_name);
+    });
+    if (qualified.length === 0) {
+      report.skipped.push({
+        slotId: slot.id,
+        serviceId: service.id,
+        serviceName: service.name,
+        serviceDate: service.date,
+        roleName: slot.role_name,
+        position: slot.position,
+        teamId: slot.team_id,
+        reason: "no_qualified_members",
+      });
+      continue;
+    }
+
+    const candidates = qualified.filter((p) => {
       if (assignedInServiceThisTeam.has(p.id)) return false;
       if (isPersonBlockedOut(db, p.id, service.date)) return false;
-      // ISC-53: qualification check — default-open when no restriction rows exist
-      const qualSet = qualifications.get(p.id);
-      if (qualSet !== undefined && !qualSet.has(slot.role_name)) return false;
       return true;
     });
 
