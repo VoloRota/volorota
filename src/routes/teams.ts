@@ -16,6 +16,8 @@ import {
   listCrewMembers,
   addCrewMember,
   removeCrewMember,
+  listMemberQualifications,
+  setMemberQualifications,
 } from "../db/queries.js";
 import { layout, escHtml, flash } from "../views/layout.js";
 
@@ -119,19 +121,39 @@ teamsRouter.get("/:id", (c) => {
     )
     .join("");
 
+  // Build per-member qualification checkboxes (ISC-53)
+  // Default-open: member with no restriction rows = all checkboxes rendered as checked.
+  // If some roles are checked and others unchecked, restriction rows exist for the checked ones.
   const memberRows = members
-    .map(
-      (p) =>
-        `<tr>
+    .map((p) => {
+      const qualRows = listMemberQualifications(db, id, p.id);
+      // qualRows is empty → no restriction → render all as checked (default-open)
+      const allUnrestricted = qualRows.length === 0;
+
+      const roleCheckboxes = roles.length > 0
+        ? `<form method="POST" action="/admin/teams/${id}/members/${p.id}/qualifications" style="display:inline;flex-direction:row;gap:.4rem;align-items:center;flex-wrap:wrap">
+            ${roles.map((r) => {
+              const checked = allUnrestricted || qualRows.includes(r.name);
+              return `<label style="font-size:.85rem;display:inline-flex;align-items:center;gap:.2rem">
+                <input type="checkbox" name="role" value="${escHtml(r.name)}"${checked ? " checked" : ""}/>
+                ${escHtml(r.name)}
+              </label>`;
+            }).join(" ")}
+            <button class="btn btn-sm" type="submit" style="margin-left:.4rem">Save</button>
+           </form>`
+        : `<em style="font-size:.8rem;color:#888">No roles defined</em>`;
+
+      return `<tr>
           <td>${escHtml(p.name)}</td>
           <td>${escHtml(p.email)}</td>
+          <td>${roleCheckboxes}</td>
           <td>
             <form method="POST" action="/admin/teams/${id}/members/${p.id}/remove" style="display:inline">
               <button class="btn btn-sm btn-danger" type="submit">Remove</button>
             </form>
           </td>
-        </tr>`
-    )
+        </tr>`;
+    })
     .join("");
 
   const memberOptions = nonMembers
@@ -222,8 +244,8 @@ teamsRouter.get("/:id", (c) => {
 
     <h2>Members</h2>
     <table>
-      <thead><tr><th>Name</th><th>Email</th><th></th></tr></thead>
-      <tbody>${memberRows.length ? memberRows : '<tr><td colspan="3" style="color:#999">No members.</td></tr>'}</tbody>
+      <thead><tr><th>Name</th><th>Email</th><th>Qualified Roles</th><th></th></tr></thead>
+      <tbody>${memberRows.length ? memberRows : '<tr><td colspan="4" style="color:#999">No members.</td></tr>'}</tbody>
     </table>
     ${
       memberOptions
@@ -318,6 +340,39 @@ teamsRouter.post("/:id/members/:personId/remove", (c) => {
   const personId = Number(c.req.param("personId"));
   removeTeamMember(db, personId, id);
   return c.redirect(`/admin/teams/${id}?msg=Member+removed`);
+});
+
+// Save role qualifications for a member (ISC-53)
+// Form posts zero or more "role" fields — checked checkboxes only.
+// Semantics: if all roles are checked → we store NO rows (default-open).
+// If a subset is checked → we store only the checked role names as restrictions.
+// If none are checked → we store NO rows (treated same as all-open, because
+//   "no roles at all" is an edge case with no practical meaning; UI always shows
+//   at least one role when roles exist, so a blank save means "nothing changed").
+teamsRouter.post("/:id/members/:personId/qualifications", async (c) => {
+  const db = getDb();
+  const teamId = Number(c.req.param("id"));
+  const personId = Number(c.req.param("personId"));
+
+  const formData = await c.req.parseBody({ all: true });
+  const rawRoles = formData["role"];
+  const checkedRoles: string[] = rawRoles === undefined
+    ? []
+    : Array.isArray(rawRoles)
+    ? (rawRoles as string[])
+    : [rawRoles as string];
+
+  // Fetch the team's current roles to detect "all checked" state
+  const allRoles = listTeamRoles(db, teamId);
+  const allRoleNames = allRoles.map((r) => r.name);
+
+  // If every role is checked (or no roles exist), remove all restriction rows → default-open
+  const allChecked = allRoleNames.length === 0 ||
+    allRoleNames.every((rn) => checkedRoles.includes(rn));
+
+  setMemberQualifications(db, teamId, personId, allChecked ? [] : checkedRoles);
+
+  return c.redirect(`/admin/teams/${teamId}?msg=Qualifications+saved`);
 });
 
 // Create crew

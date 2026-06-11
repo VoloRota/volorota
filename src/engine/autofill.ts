@@ -43,6 +43,7 @@ import {
   getTeam,
   isPersonBlockedOut,
   lastServedDateByPerson,
+  listTeamQualifications,
   type Service,
   type ServiceSlot,
   type Assignment,
@@ -76,6 +77,12 @@ export interface FillResult {
   personId: number;
   personName: string;
   crewName?: string;
+  /**
+   * ISC-54: present when the chosen person was already assigned elsewhere in
+   * this service (across teams) and was the only available candidate.
+   * Value: "double_booked"
+   */
+  flags?: "double_booked";
 }
 
 export interface SkipResult {
@@ -86,7 +93,14 @@ export interface SkipResult {
   roleName: string;
   position: number;
   teamId: number;
-  reason: "all_candidates_blocked" | "no_team_members" | "no_crew_members" | "crew_member_blocked" | "already_assigned";
+  reason:
+    | "all_candidates_blocked"
+    | "no_team_members"
+    | "no_crew_members"
+    | "crew_member_blocked"
+    | "already_assigned"
+    | "no_qualified_in_crew" // ISC-53: crew member not qualified for this role
+    | "no_qualified_members"; // ISC-53: no team member is qualified for this role
   /** For crew mode: which crew was assigned to this service. */
   crewName?: string;
   personId?: number;
@@ -179,7 +193,13 @@ function fillIndividualSlots(
   // In-run tracking: personId → last served date (updated as we fill)
   lastServedInRun: Map<number, string | null>,
   // In-run tracking: which person ids are already assigned in this service
-  assignedInServiceThisRun: Set<number>,
+  // for this team (within-team exclusion — pre-seeded from existing assignments)
+  assignedInServiceThisTeam: Set<number>,
+  // ISC-54: cross-team same-service set — persons already serving this service
+  // via ANY team.  Filled + updated as each assignment is written across all teams.
+  assignedInServiceCrossTeam: Set<number>,
+  // ISC-53: qualification map for this team (see listTeamQualifications)
+  qualifications: Map<number, Set<string>>,
   report: AutofillReport
 ): void {
   for (const slot of slots) {
@@ -204,9 +224,30 @@ function fillIndividualSlots(
       continue;
     }
 
-    // Filter: not blocked out, not already in this service
-    const candidates = members.filter((p) => {
-      if (assignedInServiceThisRun.has(p.id)) return false;
+    // Filter: not blocked out, not already in this service (within-team),
+    //         and qualified for this slot's role (ISC-53)
+    // ISC-53 qualification gate first, separately, so the skip reason can
+    // distinguish "nobody is qualified" from "everyone is blocked out"
+    const qualified = members.filter((p) => {
+      const qualSet = qualifications.get(p.id);
+      return qualSet === undefined || qualSet.has(slot.role_name);
+    });
+    if (qualified.length === 0) {
+      report.skipped.push({
+        slotId: slot.id,
+        serviceId: service.id,
+        serviceName: service.name,
+        serviceDate: service.date,
+        roleName: slot.role_name,
+        position: slot.position,
+        teamId: slot.team_id,
+        reason: "no_qualified_members",
+      });
+      continue;
+    }
+
+    const candidates = qualified.filter((p) => {
+      if (assignedInServiceThisTeam.has(p.id)) return false;
       if (isPersonBlockedOut(db, p.id, service.date)) return false;
       return true;
     });
@@ -225,8 +266,17 @@ function fillIndividualSlots(
       continue;
     }
 
+    // ISC-54: separate candidates into those not yet serving this service
+    // (preferred) and those already serving via another team (last resort).
+    const preferredCandidates = candidates.filter((p) => !assignedInServiceCrossTeam.has(p.id));
+    const lastResortCandidates = candidates.filter((p) => assignedInServiceCrossTeam.has(p.id));
+
+    // Pick from preferred if available; else fall back to last-resort + flag
+    const pool = preferredCandidates.length > 0 ? preferredCandidates : lastResortCandidates;
+    const isDoubleBook = preferredCandidates.length === 0 && lastResortCandidates.length > 0;
+
     // Sort by least-recently-served: null (never served) first, then ascending date, then id
-    candidates.sort((a, b) => {
+    pool.sort((a, b) => {
       const aDate = lastServedInRun.get(a.id) ?? null;
       const bDate = lastServedInRun.get(b.id) ?? null;
 
@@ -238,16 +288,17 @@ function fillIndividualSlots(
       return a.id - b.id;
     });
 
-    const chosen = candidates[0]!;
+    const chosen = pool[0]!;
 
     // Write to DB
     insertAssignment(db, slot.id, chosen.id);
 
     // Update in-run state
     lastServedInRun.set(chosen.id, service.date);
-    assignedInServiceThisRun.add(chosen.id);
+    assignedInServiceThisTeam.add(chosen.id);
+    assignedInServiceCrossTeam.add(chosen.id);
 
-    report.filled.push({
+    const fillEntry: FillResult = {
       slotId: slot.id,
       serviceId: service.id,
       serviceName: service.name,
@@ -257,7 +308,11 @@ function fillIndividualSlots(
       teamId: slot.team_id,
       personId: chosen.id,
       personName: chosen.name,
-    });
+    };
+    if (isDoubleBook) {
+      fillEntry.flags = "double_booked";
+    }
+    report.filled.push(fillEntry);
   }
 }
 
@@ -272,6 +327,10 @@ function fillCrewSlots(
   existingAssignments: Map<number, Assignment>,
   crews: Crew[],
   assignedCrew: Crew,
+  // ISC-54: cross-team same-service set (shared across all teams for this service)
+  assignedInServiceCrossTeam: Set<number>,
+  // ISC-53: qualification map for this team
+  qualifications: Map<number, Set<string>>,
   report: AutofillReport
 ): void {
   const crewMembers = listCrewMembers(db, assignedCrew.id);
@@ -325,7 +384,45 @@ function fillCrewSlots(
       continue;
     }
 
+    // ISC-53: qualification check — leave unfilled if crew member not qualified
+    const qualSet = qualifications.get(member.id);
+    if (qualSet !== undefined && !qualSet.has(slot.role_name)) {
+      report.skipped.push({
+        slotId: slot.id,
+        serviceId: service.id,
+        serviceName: service.name,
+        serviceDate: service.date,
+        roleName: slot.role_name,
+        position: slot.position,
+        teamId: slot.team_id,
+        reason: "no_qualified_in_crew",
+        crewName: assignedCrew.name,
+        personId: member.id,
+        personName: member.name,
+      });
+      continue;
+    }
+
+    // ISC-54: crew mode cross-team conflict — leave slot unfilled (consistent with ISC-51)
+    if (assignedInServiceCrossTeam.has(member.id)) {
+      report.skipped.push({
+        slotId: slot.id,
+        serviceId: service.id,
+        serviceName: service.name,
+        serviceDate: service.date,
+        roleName: slot.role_name,
+        position: slot.position,
+        teamId: slot.team_id,
+        reason: "crew_member_blocked",
+        crewName: assignedCrew.name,
+        personId: member.id,
+        personName: member.name,
+      });
+      continue;
+    }
+
     insertAssignment(db, slot.id, member.id);
+    assignedInServiceCrossTeam.add(member.id);
 
     report.filled.push({
       slotId: slot.id,
@@ -392,8 +489,15 @@ export function runAutofill(db: Database, options: AutofillOptions = {}): Autofi
     // Group slots by team
     const teamIds = [...new Set(allSlots.map((s) => s.team_id))];
 
+    // ISC-54: cross-team same-service set — tracks ALL persons already serving
+    // this service (from pre-existing assignments across any team + filled this run).
+    // Seeded with all pre-existing assignment persons regardless of team.
+    const assignedInServiceCrossTeam = new Set<number>(
+      existingAssignments.map((a) => a.person_id)
+    );
+
     // Track which persons are already assigned in this service (manual + auto this run)
-    // keyed per-team for individual mode; reset per service
+    // keyed per-team for individual mode within-team exclusion; reset per service
     const assignedInServiceByTeam = new Map<number, Set<number>>();
     for (const teamId of teamIds) {
       const assignedSet = new Set<number>(
@@ -415,6 +519,9 @@ export function runAutofill(db: Database, options: AutofillOptions = {}): Autofi
         .filter((s) => s.team_id === teamId)
         .sort((a, b) => a.position - b.position || a.id - b.id);
 
+      // ISC-53: load qualification map for this team (batch — one query per team)
+      const qualifications = listTeamQualifications(db, teamId);
+
       if (team.scheduling_mode === "individual") {
         // Lazily initialize last-served map for this team
         if (!teamLastServed.has(teamId)) {
@@ -430,6 +537,8 @@ export function runAutofill(db: Database, options: AutofillOptions = {}): Autofi
           assignmentBySlot,
           lastServedMap,
           assignedSet,
+          assignedInServiceCrossTeam,
+          qualifications,
           report
         );
       } else {
@@ -470,6 +579,8 @@ export function runAutofill(db: Database, options: AutofillOptions = {}): Autofi
           assignmentBySlot,
           crews,
           assignedCrew,
+          assignedInServiceCrossTeam,
+          qualifications,
           report
         );
       }

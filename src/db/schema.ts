@@ -137,4 +137,27 @@ export function applySchema(db: Database): void {
       created_at TEXT    NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  // RoleQualifications feature (ISC-53, ISC-54)
+  //
+  // SEMANTIC CONTRACT: absence of rows means the person is qualified for ALL roles
+  // on that team (default-open). A row exists only when an admin has explicitly
+  // restricted a member to a subset of roles.  Rows keyed on the role_name string
+  // so they stay consistent with the service_slots snapshot approach.
+  //
+  // Role rename/delete handling: qualification rows carry the role_name string at
+  // the time they were created.  If a team_role row is renamed, existing qualification
+  // rows still reference the old name.  The team detail page UI re-reads live
+  // team_roles, so stale qualification rows for a renamed/deleted role are silently
+  // orphaned — they never match a real slot and cause no harm.  An admin can reset
+  // qualifications for a member (i.e. save a new all-checked state) to clean up.
+  // CASCADE on team_id and person_id ensures cleanup when a team or person is removed.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS member_role_qualifications (
+      team_id    INTEGER NOT NULL REFERENCES teams(id)  ON DELETE CASCADE,
+      person_id  INTEGER NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+      role_name  TEXT    NOT NULL,
+      PRIMARY KEY (team_id, person_id, role_name)
+    );
+  `);
 }
