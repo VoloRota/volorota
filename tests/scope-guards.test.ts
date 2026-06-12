@@ -201,3 +201,77 @@ describe("ISC-42: zero third-party resource references (static)", () => {
     expect(/@import\s+["'(]/i.test(css)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// CSP honesty guard — script-src 'none' means NO page may render a <script>
+// tag or inline JS handler. Two legacy team→role cascades violated this and
+// broke silently under the v1.1 CSP (caught by demo review 2026-06-12).
+// ---------------------------------------------------------------------------
+
+describe("CSP honesty: no client JS anywhere", () => {
+  test("no <script> tags or on* handlers in any rendered page", async () => {
+    const person = createPerson(db, "Dana Guard", "dana.guard@example.com");
+    const team = createTeam(db, "Ushers", "individual");
+    createTeamRole(db, team.id, "Usher", 1);
+    addTeamMember(db, person.id, team.id);
+    const svc = createOneOffService(db, "Sunday", "2030-02-03", "10:00", [
+      { teamId: team.id, roleName: "Usher", position: 0 },
+    ]);
+    const tmplId = (
+      db.prepare("INSERT INTO service_templates (name, weekday, time) VALUES ('T','0','10:30') RETURNING id").get() as { id: number }
+    ).id;
+    const tok = await createOrReplaceToken(db, person.id);
+    const cookie = await adminCookie();
+
+    const routes = [
+      "/admin", "/admin/login", "/admin/people", "/admin/teams", `/admin/teams/${team.id}`,
+      "/admin/templates", `/admin/templates/${tmplId}`, "/admin/services",
+      `/admin/services/${svc.id}`, "/admin/matrix", "/admin/outbox", "/admin/print",
+      `/v/${tok}`,
+    ];
+    for (const path of routes) {
+      const res = await app.fetch(
+        new Request(`http://x${path}`, { headers: { Cookie: cookie, Accept: "text/html" } })
+      );
+      const html = await res.text();
+      expect(`${path}:${/<script\b/i.test(html)}`).toBe(`${path}:false`);
+      expect(`${path}:${/\son(change|click|load|submit|input)=/i.test(html)}`).toBe(`${path}:false`);
+    }
+  });
+
+  test("grouped team|role pickers work without JS: template role + service slot", async () => {
+    const cookie = await adminCookie();
+    const team = createTeam(db, "Worship", "individual");
+    createTeamRole(db, team.id, "Keys", 1);
+    const tmplId = (
+      db.prepare("INSERT INTO service_templates (name, weekday, time) VALUES ('S','0','10:30') RETURNING id").get() as { id: number }
+    ).id;
+    // template role via combined picker value
+    let res = await app.fetch(new Request(`http://x/admin/templates/${tmplId}/roles`, {
+      method: "POST",
+      headers: { Cookie: cookie, "Content-Type": "application/x-www-form-urlencoded" },
+      body: `team_role=${team.id}%7CKeys&headcount=1`,
+    }));
+    expect(res.status).toBe(302);
+    const tr = db.query("SELECT * FROM service_template_roles WHERE template_id = ?").all(tmplId) as any[];
+    expect(tr.length).toBe(1);
+    expect(tr[0].role_name).toBe("Keys");
+    expect(tr[0].team_id).toBe(team.id);
+    // service slot via combined picker value
+    const svc = createOneOffService(db, "Sunday2", "2030-02-10", "10:00", []);
+    res = await app.fetch(new Request(`http://x/admin/services/${svc.id}/slots`, {
+      method: "POST",
+      headers: { Cookie: cookie, "Content-Type": "application/x-www-form-urlencoded" },
+      body: `team_role=${team.id}%7CKeys`,
+    }));
+    expect(res.status).toBe(302);
+    const slots = db.query("SELECT * FROM service_slots WHERE service_id = ?").all(svc.id) as any[];
+    expect(slots.length).toBe(1);
+    expect(slots[0].role_name).toBe("Keys");
+    // rendered service page offers the optgroup picker
+    const page = await app.fetch(new Request(`http://x/admin/services/${svc.id}`, { headers: { Cookie: cookie, Accept: "text/html" } }));
+    const html = await page.text();
+    expect(html).toContain("<optgroup");
+    expect(html).toContain(`value="${team.id}|Keys"`);
+  });
+});
