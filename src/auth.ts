@@ -297,6 +297,14 @@ function loginPage(errorMsg: string | null = null): string {
     errorMsg
       ? `<div class="flash flash-error">${escHtml(errorMsg)}</div>`
       : "";
+
+  // ISC-58: optional hint from env — e.g. the demo can publish the password here.
+  // Escaped to prevent HTML injection; unset → no element.
+  const rawHint = process.env.VOLOROTA_LOGIN_HINT;
+  const hint = rawHint
+    ? `<p class="login-hint">${escHtml(rawHint)}</p>`
+    : "";
+
   return layout(
     "Login",
     `<div class="login-page">
@@ -315,6 +323,7 @@ function loginPage(errorMsg: string | null = null): string {
           </div>
           <button type="submit" style="width:100%;margin-top:.5rem">Sign in</button>
         </form>
+        ${hint}
       </div>
     </div>`,
     { loggedIn: false }
@@ -362,12 +371,15 @@ export async function handleLoginPost(c: Context<AuthEnv>): Promise<Response> {
   const payload = JSON.stringify({ admin: true, exp: Date.now() + SESSION_MAXAGE * 1000 });
   const signed = await signPayload(payload, secret);
 
+  // ISC-62: Secure flag is set automatically when VOLOROTA_BASE_URL starts with
+  // https:// — no separate env required. Omitted on plain HTTP so local dev works.
+  const isHttps = (process.env.VOLOROTA_BASE_URL ?? "").startsWith("https://");
   setCookie(c, COOKIE_NAME, signed, {
     httpOnly: true,
     sameSite: "Lax",
     maxAge: SESSION_MAXAGE,
     path: "/",
-    // secure: true — set by reverse proxy in production; omit here for HTTP dev
+    secure: isHttps,
   });
 
   return c.redirect("/admin", 302);

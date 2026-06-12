@@ -221,6 +221,12 @@ Destroying the container and re-creating it with the same volume restores all da
 
 ---
 
+## Production Checklist
+
+Before pointing real volunteers at your instance, work through the [production operations checklist](docs/production.md) — it covers BASE_URL, HTTPS/TLS, session secret, SMTP verification, backups, restore procedure, and upgrade expectations.
+
+---
+
 ## License
 
 VoloRota is free software: you can redistribute it and/or modify it under the terms of the [GNU Affero General Public License v3.0](LICENSE) as published by the Free Software Foundation.

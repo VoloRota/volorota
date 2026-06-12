@@ -57,6 +57,27 @@ setInterval(() => {
 
 const app = new Hono<AuthEnv>();
 
+// Security headers — applied globally before any route (ISC-61)
+// CSP: no JS in the app; inline styles used by volunteer layout + interstitials;
+// favicon is a data URI so img-src must allow data:.
+const CSP =
+  "default-src 'self'; " +
+  "script-src 'none'; " +
+  "style-src 'self' 'unsafe-inline'; " +
+  "img-src 'self' data:; " +
+  "frame-ancestors 'none'; " +
+  "form-action 'self'; " +
+  "base-uri 'none'";
+
+app.use("*", (c, next) => {
+  c.res.headers.set("Content-Security-Policy", CSP);
+  c.res.headers.set("X-Frame-Options", "DENY");
+  c.res.headers.set("X-Content-Type-Options", "nosniff");
+  c.res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  return next();
+});
+
 // Static files
 app.use("/static/*", serveStatic({ root: "./public", rewriteRequestPath: (p) => p.replace(/^\/static/, "") }));
 
@@ -91,6 +112,19 @@ app.get("/admin", (c) => {
        </div>`
     : "";
 
+  // ISC-64: warn when BASE_URL is unset or still points at localhost
+  const baseUrl = process.env.VOLOROTA_BASE_URL ?? "";
+  const baseUrlIsLocal =
+    !baseUrl ||
+    baseUrl.includes("localhost") ||
+    baseUrl.includes("127.0.0.1");
+  const baseUrlWarning = baseUrlIsLocal
+    ? `<div class="flash flash-warn">
+         <strong>Configuration notice:</strong> Emailed links will point at localhost — set
+         <code>VOLOROTA_BASE_URL</code> to your public URL so volunteers can open their links.
+       </div>`
+    : "";
+
   // Setup checklist — only shown while no assignment exists (ISC-56).
   // Once at least one assignment is present the checklist is permanently absent.
   function checklistStep(done: boolean, text: string, href: string): string {
@@ -121,6 +155,7 @@ app.get("/admin", (c) => {
   const body = `
     <h1>Dashboard</h1>
     ${captureBanner}
+    ${baseUrlWarning}
     ${setupChecklist}
     <div class="dash-grid">
       <a class="dash-card" href="/admin/matrix">
@@ -178,6 +213,8 @@ app.route("/v", volunteerRouter);
 //   VOLOROTA_DB            — path to SQLite file (default: ./data/volorota.db)
 //   VOLOROTA_ADMIN_PASSWORD — required; admin login password
 //   VOLOROTA_SESSION_SECRET — optional; ≥32 chars, else generated and persisted in DB
+//   VOLOROTA_BASE_URL      — optional; public URL used in emailed links (ISC-62, ISC-64)
+//   VOLOROTA_LOGIN_HINT    — optional; hint text shown beneath the admin login form (ISC-58)
 //   VOLOROTA_SMTP_HOST/PORT/USER/PASS/FROM/SECURE — optional; capture mode when unset
 //   VOLOROTA_ADMIN_EMAIL   — optional; leader-notification fallback recipient
 //   VOLOROTA_REMINDER_DAYS — optional; default "3", comma-separated (e.g. "7,3")

@@ -25,6 +25,32 @@ import { getTeamName } from "../db/onboarding.js";
 
 export const servicesRouter = new Hono();
 
+// ---------------------------------------------------------------------------
+// ISC-65: date-range defaults — upcoming Sunday → +8 weeks
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the YYYY-MM-DD string for the upcoming Sunday (today if today is
+ * Sunday, otherwise the next Sunday).
+ */
+function upcomingSunday(from: Date = new Date()): string {
+  const d = new Date(from);
+  const dayOfWeek = d.getDay(); // 0 = Sun
+  if (dayOfWeek !== 0) {
+    d.setDate(d.getDate() + (7 - dayOfWeek));
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Returns the YYYY-MM-DD string 8 weeks after the given date string.
+ */
+function plusEightWeeks(dateStr: string): string {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + 56); // 8 * 7
+  return d.toISOString().slice(0, 10);
+}
+
 // List services + generate/create forms
 servicesRouter.get("/", (c) => {
   const db = getDb();
@@ -53,6 +79,10 @@ servicesRouter.get("/", (c) => {
     )
     .join("");
 
+  // ISC-65: prefill forms with upcoming Sunday → +8 weeks
+  const defaultFrom = upcomingSunday();
+  const defaultTo = plusEightWeeks(defaultFrom);
+
   const body = `
     <h1>Services</h1>
     ${flash(msg, "success")}
@@ -69,11 +99,11 @@ servicesRouter.get("/", (c) => {
               </div>
               <div class="form-row">
                 <label for="start">Start Date</label>
-                <input type="date" id="start" name="start_date" required />
+                <input type="date" id="start" name="start_date" required value="${defaultFrom}" />
               </div>
               <div class="form-row">
                 <label for="end">End Date</label>
-                <input type="date" id="end" name="end_date" required />
+                <input type="date" id="end" name="end_date" required value="${defaultTo}" />
               </div>
               <button type="submit">Generate</button>
             </form>
@@ -105,11 +135,11 @@ servicesRouter.get("/", (c) => {
       <form method="POST" action="/admin/services/autofill-range">
         <div class="form-row">
           <label for="af_start">Start Date</label>
-          <input type="date" id="af_start" name="start_date" required />
+          <input type="date" id="af_start" name="start_date" required value="${defaultFrom}" />
         </div>
         <div class="form-row">
           <label for="af_end">End Date</label>
-          <input type="date" id="af_end" name="end_date" required />
+          <input type="date" id="af_end" name="end_date" required value="${defaultTo}" />
         </div>
         <button type="submit">Auto-fill All Services</button>
       </form>
