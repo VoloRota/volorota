@@ -17,6 +17,8 @@ services:
       VOLOROTA_ADMIN_PASSWORD: ${VOLOROTA_ADMIN_PASSWORD:?set in .env}
       # Public URL — used in emailed magic links and calendar-feed URLs
       VOLOROTA_BASE_URL: https://${DEMO_DOMAIN:?set in .env}
+      # Login-page hint (generic feature; the demo uses it for the published password)
+      VOLOROTA_LOGIN_HINT: ${VOLOROTA_LOGIN_HINT:-}
       # Deliberately NO VOLOROTA_SMTP_* — the app runs in capture mode:
       # every "sent" email lands in the admin-visible outbox instead of
       # leaving the box. That is the demo's mail sandbox (ISC-44).
