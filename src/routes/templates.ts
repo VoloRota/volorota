@@ -128,6 +128,18 @@ templatesRouter.get("/:id", (c) => {
     .map((t) => `<option value="${t.id}">${escHtml(t.name)}</option>`)
     .join("");
 
+  // Grouped team→role options — server-rendered, no client JS (CSP: script-src 'none')
+  const teamRoleOptgroups = teams
+    .map((t) => {
+      const roles = listTeamRoles(db, t.id);
+      if (roles.length === 0) return "";
+      const opts = roles
+        .map((r) => `<option value="${t.id}|${escHtml(r.name)}">${escHtml(r.name)}</option>`)
+        .join("");
+      return `<optgroup label="${escHtml(t.name)}">${opts}</optgroup>`;
+    })
+    .join("");
+
   const dayOptions = WEEKDAYS.map(
     (d, i) =>
       `<option value="${i}" ${i === tmpl.weekday ? "selected" : ""}>${d}</option>`
@@ -171,24 +183,14 @@ templatesRouter.get("/:id", (c) => {
             <form method="POST" action="/admin/templates/${id}/roles"
                   style="flex-direction:row;gap:.6rem;align-items:center;flex-wrap:wrap"
                   id="addRoleForm">
-              <select name="team_id" id="teamSelect" onchange="updateRoles()">${teamOptions}</select>
-              <select name="role_name" id="roleSelect"><option value="">-- select role --</option></select>
+              <select name="team_role" required>
+                <option value="">— team &amp; role —</option>
+                ${teamRoleOptgroups}
+              </select>
               <input type="number" name="headcount" value="1" min="1" style="max-width:70px" />
               <button type="submit" class="btn btn-sm">Add</button>
             </form>
-          </div>
-          <script>
-            const teamRoles = {
-              ${teams.map((t) => `"${t.id}": ${JSON.stringify(listTeamRoles(db, t.id).map((r) => r.name))}`).join(",\n")}
-            };
-            function updateRoles() {
-              const sel = document.getElementById("teamSelect");
-              const rsel = document.getElementById("roleSelect");
-              const roles = teamRoles[sel.value] || [];
-              rsel.innerHTML = roles.map(r => \`<option value="\${r}">\${r}</option>\`).join("") || "<option value=''>No roles defined</option>";
-            }
-            updateRoles();
-          </script>`
+          </div>`
         : `<p style="color:#999">Create some teams with roles first.</p>`
     }
 
@@ -221,8 +223,12 @@ templatesRouter.post("/:id/roles", async (c) => {
   const db = getDb();
   const id = Number(c.req.param("id"));
   const body = await c.req.parseBody();
-  const teamId = Number(body["team_id"]);
-  const roleName = String(body["role_name"] ?? "").trim();
+  // team_role carries "teamId|roleName" from the grouped picker; the separate
+  // fields remain accepted for API-style posts
+  const combined = String(body["team_role"] ?? "");
+  const sep = combined.indexOf("|");
+  const teamId = Number(body["team_id"]) || (sep > 0 ? Number(combined.slice(0, sep)) : 0);
+  const roleName = sep > 0 ? combined.slice(sep + 1).trim() : String(body["role_name"] ?? "").trim();
   const headcount = Number(body["headcount"] ?? 1);
 
   if (!roleName) return c.redirect(`/admin/templates/${id}?err=Role+name+required`);

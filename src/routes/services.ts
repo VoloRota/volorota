@@ -284,9 +284,17 @@ servicesRouter.get("/:id", (c) => {
     })
     .join("");
 
-  // Add slot form (for one-off or to supplement)
-  const teamOptions = teams
-    .map((t) => `<option value="${t.id}">${escHtml(t.name)}</option>`)
+  // Add slot form (for one-off or to supplement) — grouped team→role options,
+  // server-rendered, no client JS (CSP: script-src 'none')
+  const slotTeamRoleOptgroups = teams
+    .map((t) => {
+      const roles = listTeamRoles(db, t.id);
+      if (roles.length === 0) return "";
+      const opts = roles
+        .map((r) => `<option value="${t.id}|${escHtml(r.name)}">${escHtml(r.name)}</option>`)
+        .join("");
+      return `<optgroup label="${escHtml(t.name)}">${opts}</optgroup>`;
+    })
     .join("");
 
   // Notes section (ISC-45)
@@ -344,23 +352,13 @@ servicesRouter.get("/:id", (c) => {
             <form method="POST" action="/admin/services/${id}/slots"
                   style="flex-direction:row;gap:.6rem;align-items:center;flex-wrap:wrap"
                   id="addSlotForm">
-              <select name="team_id" id="slotTeamSelect" onchange="updateSlotRoles()">${teamOptions}</select>
-              <select name="role_name" id="slotRoleSelect"><option value="">-- role --</option></select>
+              <select name="team_role" required>
+                <option value="">— team &amp; role —</option>
+                ${slotTeamRoleOptgroups}
+              </select>
               <button type="submit" class="btn btn-sm">Add Slot</button>
             </form>
-          </div>
-          <script>
-            const slotTeamRoles = {
-              ${teams.map((t) => `"${t.id}": ${JSON.stringify(listTeamRoles(db, t.id).map((r) => r.name))}`).join(",\n")}
-            };
-            function updateSlotRoles() {
-              const sel = document.getElementById("slotTeamSelect");
-              const rsel = document.getElementById("slotRoleSelect");
-              const roles = slotTeamRoles[sel.value] || [];
-              rsel.innerHTML = roles.map(r => \`<option value="\${r}">\${r}</option>\`).join("") || "<option value=''>No roles</option>";
-            }
-            updateSlotRoles();
-          </script>`
+          </div>`
         : ""
     }
 
@@ -424,10 +422,14 @@ servicesRouter.post("/:id/slots", async (c) => {
   const db = getDb();
   const id = Number(c.req.param("id"));
   const body = await c.req.parseBody();
-  const teamId = Number(body["team_id"]);
-  const roleName = String(body["role_name"] ?? "").trim();
+  // team_role carries "teamId|roleName" from the grouped picker; the separate
+  // fields remain accepted for API-style posts
+  const combined = String(body["team_role"] ?? "");
+  const sep = combined.indexOf("|");
+  const teamId = Number(body["team_id"]) || (sep > 0 ? Number(combined.slice(0, sep)) : 0);
+  const roleName = sep > 0 ? combined.slice(sep + 1).trim() : String(body["role_name"] ?? "").trim();
 
-  if (!roleName) return c.redirect(`/admin/services/${id}?err=Role+name+required`);
+  if (!roleName || !teamId) return c.redirect(`/admin/services/${id}?err=Team+and+role+required`);
 
   const slots = listServiceSlots(db, id);
   const position = slots.length;
