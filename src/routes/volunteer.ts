@@ -42,7 +42,7 @@ import {
   createOrReplaceToken,
 } from "../volunteer/tokens.js";
 import { sendMail, sendReplacementRequestEmail, sendLeaderNotification } from "../mail/mailer.js";
-import { escHtml } from "../views/layout.js";
+import { escHtml, FAVICON_LINK } from "../views/layout.js";
 import { getConfirmedAssignments, buildIcsFeed } from "../calendar/ics.js";
 
 // ---------------------------------------------------------------------------
@@ -74,6 +74,7 @@ function volLayout(title: string, body: string): string {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escHtml(title)} — VoloRota</title>
+  ${FAVICON_LINK}
   <style>
     /* === VoloRota volunteer surface — mobile-first, self-contained === */
     /* Tokens */
