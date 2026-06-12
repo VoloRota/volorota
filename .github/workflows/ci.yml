@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Install, typecheck, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bunx tsc --noEmit
+
+      - name: Run tests
+        run: bun test
+        env:
+          VOLOROTA_ADMIN_PASSWORD: ci-test-password
+
+  docker-build:
+    name: Docker build + smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t volorota:ci .
+
+      - name: Smoke test — /health returns 200 with status ok
+        run: |
+          docker run -d \
+            --name volorota-smoke \
+            -p 3000:3000 \
+            -v volorota_smoke:/data \
+            -e VOLOROTA_ADMIN_PASSWORD=ci-smoke-password \
+            volorota:ci
+
+          # Give the server a moment to start
+          sleep 3
+
+          RESPONSE=$(curl -sf http://localhost:3000/health)
+          echo "Health response: $RESPONSE"
+          echo "$RESPONSE" | grep -q '"status":"ok"'
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop volorota-smoke 2>/dev/null || true
+          docker rm   volorota-smoke 2>/dev/null || true
+          docker volume rm volorota_smoke 2>/dev/null || true

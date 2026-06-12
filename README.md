@@ -1,4 +1,4 @@
-# VoloRota
+# VoloRota [![CI](https://github.com/VoloRota/volorota/actions/workflows/ci.yml/badge.svg)](https://github.com/VoloRota/volorota/actions/workflows/ci.yml)
 
 **A roster of the willing.** Self-hosted volunteer scheduling for churches.
 
@@ -27,16 +27,17 @@ Deliberately not included: children's check-in, giving, or a member database —
 
 ## Quickstart
 
-### Option A — Docker one-liner
+### Option A — Docker one-liner (pre-built image)
+
+The image is built by CI from this repository and published to the GitHub Container Registry on every commit to `main`.
 
 ```bash
 docker run -d \
   --name volorota \
   -p 3000:3000 \
   -v volorota_data:/data \
-  -e VOLOROTA_PORT=3000 \
   -e VOLOROTA_ADMIN_PASSWORD='pick-a-strong-password' \
-  volorota:latest
+  ghcr.io/volorota/volorota:latest
 ```
 
 Open `http://localhost:3000` in a browser and sign in at the login page with the password you set. `VOLOROTA_ADMIN_PASSWORD` is required — the server refuses to start without it.
