@@ -21,6 +21,9 @@ jobs:
       - name: Typecheck
         run: bunx tsc --noEmit
 
+      - name: Pre-pull Mailpit image (SMTP integration test)
+        run: docker pull -q axllent/mailpit
+
       - name: Run tests
         run: bun test
         env:

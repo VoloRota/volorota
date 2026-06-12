@@ -101,7 +101,7 @@ beforeAll(async () => {
   db.exec("PRAGMA foreign_keys = ON;");
   applySchema(db);
   setDb(db);
-});
+}, 120_000); // cold runners may need to pull the Mailpit image — 5s default is flaky in CI
 
 afterAll(async () => {
   resetToCaptureTransport();
@@ -109,7 +109,7 @@ afterAll(async () => {
     await Bun.spawn(["docker", "rm", "-f", containerId]).exited;
   }
   if (db) db.close();
-});
+}, 30_000);
 
 // ---------------------------------------------------------------------------
 // ISC-34: SMTP delivery test
