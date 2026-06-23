@@ -55,7 +55,7 @@ async function login(app: Hono<AuthEnv>): Promise<string> {
     body: `password=${encodeURIComponent(TEST_PASSWORD)}`,
   });
   const cookie = res.headers.get("Set-Cookie") ?? "";
-  return cookie.split(";")[0];
+  return cookie.split(";")[0] ?? "";
 }
 
 // ---------------------------------------------------------------------------
@@ -152,8 +152,9 @@ test("POST /test-email in capture mode captures message and redirects with succe
 
   const captured = getCapturedMail();
   expect(captured).toHaveLength(1);
-  expect(captured[0].to).toBe("test@example.com");
-  expect(captured[0].subject).toBe("[VoloRota] Test email");
+  const [first] = captured;
+  expect(first?.to).toBe("test@example.com");
+  expect(first?.subject).toBe("[VoloRota] Test email");
 });
 
 test("POST /test-email stores message in outbox table", async () => {
