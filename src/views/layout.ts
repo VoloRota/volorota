@@ -17,6 +17,7 @@ export function layout(title: string, body: string, opts?: { loggedIn?: boolean 
     <a href="/admin/templates">Templates</a>
     <a href="/admin/services">Services</a>
     <a href="/admin/outbox">Outbox</a>
+    <a href="/admin/settings">Settings</a>
     ${showLogout
       ? `<form method="POST" action="/admin/logout" style="margin-left:auto">
            <button type="submit" class="btn-logout">Sign out</button>

@@ -11,6 +11,7 @@ import { makeHealthRouter } from "./routes/health.js";
 import { volunteerRouter } from "./routes/volunteer.js";
 import { adminVolunteerRouter } from "./routes/admin-volunteer.js";
 import { outboxRouter } from "./routes/outbox.js";
+import { settingsRouter } from "./routes/settings.js";
 import { exportRouter, printRouter } from "./routes/export.js";
 import { layout } from "./views/layout.js";
 import {
@@ -197,6 +198,7 @@ app.route("/admin/services", exportRouter);
 app.route("/admin/services", servicesRouter);
 app.route("/admin/matrix", matrixRouter);
 app.route("/admin/outbox", outboxRouter);
+app.route("/admin/settings", settingsRouter);
 
 // Admin volunteer touchpoints (inside auth gate via /admin/* middleware above)
 app.route("/admin/people", adminVolunteerRouter);
