@@ -87,6 +87,11 @@
   @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
   @media (prefers-reduced-motion: reduce){.rise,.mcell{animation:none;opacity:1}}
 
+  /* ——— why this exists / what this isn't ——— */
+  .gap,.scope{border-top:1px solid var(--rule);padding:3rem 0}
+  .gap p,.scope p{color:var(--ink-soft);max-width:38rem;margin-bottom:1rem;font-size:.98rem}
+  .gap p:last-child,.scope p:last-child{margin-bottom:0}
+
   /* ——— numbered editorial reasons ——— */
   .reasons{border-top:1px solid var(--rule);padding:3.5rem 0 2.5rem;background:var(--paper-deep)}
   .sec-title{font-family:var(--serif);font-size:1.7rem;margin-bottom:2rem;letter-spacing:-.01em}
@@ -153,8 +158,8 @@
 <section class="hero"><div class="wrap">
   <div>
     <p class="eyebrow rise d1">Open source · Self-hosted · AGPL-3.0</p>
-    <h1 class="rise d2">Volunteer scheduling your church can <em>own</em>.</h1>
-    <p class="lede rise d3">Auto-fill a fair rotation around blockout dates — then volunteers accept, decline, or arrange their own replacement from an emailed link. No volunteer accounts, no passwords, no monthly fee.</p>
+    <h1 class="rise d2">Self-hosted volunteer scheduling for churches.</h1>
+    <p class="lede rise d3">VoloRota auto-fills a fair rotation around blockout dates, then lets volunteers accept, decline, or arrange their own replacement from an emailed link — no account required, and no per-user fee like Planning Center Services charges for the same task.</p>
     <div class="btns rise d4">
       <a class="btn btn-primary" href="#demo">Try the live demo</a>
       <a class="btn btn-secondary" href="https://github.com/VoloRota/volorota#quickstart">Self-host it</a>
@@ -176,6 +181,13 @@
   </div>
 </div></section>
 
+<section class="gap"><div class="wrap">
+  <h2 class="sec-title">Why this exists</h2>
+  <p>There's a gap in church software for a tool that only schedules volunteers. Most options bundle scheduling into a larger system — a membership database, giving, check-in — so a small church ends up adopting an entire platform just to build a nursery rotation.</p>
+  <p>VoloRota fills that specific gap: auto-fill, blockout dates, and volunteer links with no account required, and nothing else.</p>
+  <p>That scope has a natural end point. A church that grows into needing a full ChMS has grown past what VoloRota is built to do. That hand-off is by design.</p>
+</div></section>
+
 <section class="reasons"><div class="wrap">
   <h2 class="sec-title">Why you might find it useful</h2>
   <div class="reason-grid">
@@ -188,8 +200,8 @@
       <p>Least-recently-served goes first, role qualifications are respected — your keys player is never scheduled on vocals — and nobody is double-booked across teams. The same data always produces the same schedule.</p>
     </div></div>
     <div class="reason"><span class="rnum">03</span><div>
-      <h3>Your data, your box</h3>
-      <p>One Docker container, one SQLite file, about 18&nbsp;MB of memory. No telemetry, no third-party requests, no vendor. AGPL-3.0 keeps it that way.</p>
+      <h3>Runs entirely on your server</h3>
+      <p>One Docker container, one SQLite file, about 18&nbsp;MB of memory. No telemetry, no third-party requests, no vendor with access to your data. AGPL-3.0 exists specifically so this can't be wrapped into a closed SaaS product later.</p>
     </div></div>
     <div class="reason"><span class="rnum">04</span><div>
       <h3>Both ways churches schedule</h3>
@@ -198,9 +210,16 @@
   </div>
 </div></section>
 
+<section class="scope"><div class="wrap">
+  <h2 class="sec-title">What this isn't</h2>
+  <p>VoloRota schedules volunteers. Nothing else.</p>
+  <p>It has no membership database, no giving or donations tracking, no children's check-in. It doesn't manage song libraries, chord charts, or run sheets. There's no native mobile app, no SMS, and no multi-church hosting yet — each instance serves one church.</p>
+  <p>If you need those things, VoloRota's export options — CSV and an ICS calendar feed — make the move to a full ChMS straightforward when the time comes.</p>
+</div></section>
+
 <section class="demo" id="demo"><div class="wrap">
-  <h2 class="sec-title">Poke the demo — <em>you can’t break it</em></h2>
-  <p class="demo-sub">A fictional congregation that resets every hour. Open a volunteer link on your phone — that’s the part worth seeing.</p>
+  <h2 class="sec-title">Try the live demo</h2>
+  <p class="demo-sub">A fictional congregation resets every hour, so nothing you do here is permanent. Start with a volunteer link below — it's the flow an actual volunteer uses, and it needs no login.</p>
   <div class="demo-grid">
     <div class="cred-block">
       <h4>Admin console</h4>
@@ -241,8 +260,7 @@
 </div></section>
 
 <footer><div class="wrap">
-  <p>“Many hands make light work — somebody still has to schedule the hands.”</p>
-  <p class="small">VoloRota · <a href="https://github.com/VoloRota/volorota/blob/main/LICENSE">AGPL-3.0</a> · self-hosted · a roster of the willing</p>
+  <p class="small">VoloRota · <a href="https://github.com/VoloRota/volorota/blob/main/LICENSE">AGPL-3.0</a> · self-hosted · <a href="https://github.com/VoloRota/volorota">github.com/VoloRota/volorota</a></p>
 </div></footer>
 
 </body>
