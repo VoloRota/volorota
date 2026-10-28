@@ -160,4 +160,37 @@ export function applySchema(db: Database): void {
       PRIMARY KEY (team_id, person_id, role_name)
     );
   `);
+
+  // SMS reminder channel (provider-agnostic — see src/notifications/sms.ts)
+  //
+  // people: phone is optional; sms_opt_in is explicit consent (TCPA hygiene:
+  // no opt-in, no texts — absence of a row means the person gets email only).
+  const peopleCols = db.query("PRAGMA table_info(people)").all() as Array<{ name: string }>;
+  if (!peopleCols.find((c) => c.name === "phone")) {
+    db.exec("ALTER TABLE people ADD COLUMN phone TEXT");
+  }
+  if (!peopleCols.find((c) => c.name === "sms_opt_in")) {
+    db.exec("ALTER TABLE people ADD COLUMN sms_opt_in INTEGER NOT NULL DEFAULT 0");
+  }
+
+  // reminders_sent gains a channel dimension so email and SMS idempotency are
+  // tracked independently. Existing rows are all email sends — rebuild the
+  // table with channel DEFAULT 'email' and widen the UNIQUE key.
+  const remCols = db.query("PRAGMA table_info(reminders_sent)").all() as Array<{ name: string }>;
+  if (remCols.length > 0 && !remCols.find((c) => c.name === "channel")) {
+    db.exec(`
+      CREATE TABLE reminders_sent_new (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        assignment_id  INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+        reminder_day   INTEGER NOT NULL,
+        channel        TEXT    NOT NULL DEFAULT 'email',
+        sent_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(assignment_id, reminder_day, channel)
+      );
+      INSERT INTO reminders_sent_new (id, assignment_id, reminder_day, sent_at, channel)
+        SELECT id, assignment_id, reminder_day, sent_at, 'email' FROM reminders_sent;
+      DROP TABLE reminders_sent;
+      ALTER TABLE reminders_sent_new RENAME TO reminders_sent;
+    `);
+  }
 }
