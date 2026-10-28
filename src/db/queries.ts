@@ -8,6 +8,8 @@ export interface Person {
   id: number;
   name: string;
   email: string;
+  phone?: string | null;
+  sms_opt_in?: number | null;
   created_at: string;
 }
 
@@ -26,6 +28,23 @@ export function getPersonByEmail(db: Database, email: string): Person | null {
   return db
     .query("SELECT * FROM people WHERE email = ?")
     .get(email.toLowerCase().trim()) as Person | null;
+}
+
+/**
+ * Set a person's SMS contact details. `optIn` is explicit consent — never set
+ * it implicitly. Pass phone as null to clear.
+ */
+export function setSmsContact(
+  db: Database,
+  personId: number,
+  phone: string | null,
+  optIn: boolean
+): void {
+  db.prepare("UPDATE people SET phone = ?, sms_opt_in = ? WHERE id = ?").run(
+    phone,
+    optIn ? 1 : 0,
+    personId
+  );
 }
 
 // ---------------------------------------------------------------------------

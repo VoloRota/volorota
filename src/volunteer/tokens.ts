@@ -60,8 +60,9 @@ export function extendSchemaForVolunteer(db: Database): void {
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
       assignment_id  INTEGER NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
       reminder_day   INTEGER NOT NULL,
+      channel        TEXT    NOT NULL DEFAULT 'email',
       sent_at        TEXT    NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(assignment_id, reminder_day)
+      UNIQUE(assignment_id, reminder_day, channel)
     );
   `);
 
