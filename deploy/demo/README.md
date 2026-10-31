@@ -1,6 +1,11 @@
-# VoloRota public demo deployment
+# VoloRota demo deployment
 
-Stands up the public demo: VoloRota + Caddy (TLS), seeded with a fictional
+**No public demo is currently published.** The previous public instance was
+retired on 2026-10-31. This document stays in the repo as the recipe for
+standing one up whenever a public demo is wanted again — the steps below are
+all that is needed.
+
+Stands up a demo: VoloRota + Caddy (TLS), seeded with a fictional
 congregation, mail in capture mode (nothing leaves the box — sends appear in
 `/admin/outbox`), and an hourly reset back to seed state.
 
@@ -28,14 +33,14 @@ systemctl daemon-reload
 systemctl enable --now volorota-demo-reset.timer
 ```
 
-Point DNS (`demo.volorota.org` A record) at the VPS before `docker compose up`
+Point DNS (the demo subdomain A record) at the VPS before `docker compose up`
 so Caddy can obtain its certificate.
 
-## Demo links to publish
+## Publishing (only when a demo is wanted)
 
-- Admin: `https://demo.volorota.org` — publish the demo password openly
+- Admin: `https://<demo-domain>` — publish the demo password openly
 - Volunteer experience (no login at all):
-  `https://demo.volorota.org/v/<DEMO_TOKEN_TOM>` etc. — the fixed tokens from
+  `https://<demo-domain>/v/<DEMO_TOKEN_TOM>` etc. — the fixed tokens from
   `.env` survive resets, so published links stay valid.
 
 ## Sandbox properties
